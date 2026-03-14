@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Bus, Ship, Settings, Clock, Check, Calendar, Sun, Briefcase, ChevronRight, Star, ArrowDownCircle, ArrowUpCircle, Moon, Sun as SunIcon, Monitor, Type, Info, MessageSquareWarning, AlertTriangle, Send, X, ChevronLeft, CloudSync, CloudOff, ExternalLink } from 'lucide-react';
+import { Bus, Ship, Settings, Clock, Check, Calendar, Sun, Briefcase, ChevronRight, Star, ArrowDownCircle, ArrowUpCircle, Moon, Sun as SunIcon, Monitor, Type, Info, MessageSquareWarning, AlertTriangle, Send, X, ChevronLeft, CloudSync, CloudOff, ExternalLink, MapPin } from 'lucide-react';
 import { routes } from './data';
 import { 
   getDayType,
   parseTimeToSeconds, 
   getSecondsSinceStartOfDay, 
   findNextDepartures,
+  addMinutesToTime,
   DayType
 } from './utils';
 import { Route, TransportType, Direction, CountdownState, Language, ScheduleOverride, ThemeMode, FontSize } from './types';
@@ -110,7 +111,12 @@ const translations = {
     syncError: 'Cloud Offline',
     openForm: 'Open Report Form',
     referenceOnly: 'Data is for reference only',
-    lastUpdateLabel: 'Last News Update: '
+    lastUpdateLabel: 'Last News Update: ',
+    departFrom: 'Depart from:',
+    realTimeETA: 'Real-time ETA',
+    switchToSchedule: 'Switch to Schedule',
+    noData: 'No Data',
+    dataSource: 'Data from data.gov.hk, refreshes every 60s'
   },
   zh: {
     nextArrival: '開出時間剩餘',
@@ -190,7 +196,12 @@ const translations = {
     syncError: '雲端連線失敗',
     openForm: '前往報料表單',
     referenceOnly: '資訊僅供參考',
-    lastUpdateLabel: '路況資訊更新時間: '
+    lastUpdateLabel: '路況資訊更新時間: ',
+    departFrom: '出發地點:',
+    realTimeETA: '實時班次',
+    switchToSchedule: '切換至時間表',
+    noData: '暫無數據',
+    dataSource: '數據由資料一線通提供，每60秒更新'
   }
 };
 
@@ -239,7 +250,8 @@ const ROUTE_KEYWORDS: Record<string, string[]> = {
   'NR331': unique(['青馬大橋', '青嶼幹線', '青衣西北交匯處', '青衣北岸公路', '青荃路', '德士古道', '德士古道北', '德士古道天橋', '城門道', '西樓角路', '大河道', '青山公路-荃灣段', '青山公路-葵涌段', '國瑞路']),
   'NR331S': unique(['青馬大橋', '青嶼幹線', '青衣西北交匯處', '青衣北岸公路', '青荃路', '德士古道', '德士古道北', '德士古道天橋', '荃錦交匯處', '大河道北', '大河道', '海貴路', '大河道', '大河道北']),
   'NR334': unique(['青馬大橋', '青衣西北交匯處', '青嶼幹線', '北大嶼山公路', '機場路', '駿運路交滙處', '觀景路', '國泰城通道路', '觀景路', '東岸路', '機場路', '暢航路', '暢連路', '暢達路', '機場北交滙處', '機場路', '航天城路', '航天城交匯處', '赤鱲角路', '順朗路']),
-  'NR338': unique(['青馬大橋', '青嶼幹線', '青衣西北交匯處', '長青公路', '長青隧道', '青葵公路', '西九龍公路', '西區海底隧道', '干諾道西天橋', '干諾道中天橋', '中環及灣仔繞道', '民寶街', '金融街', '民祥街', '民耀街', '民光街', '民耀街', '民祥街', '干諾道中西行', '干諾道西'])
+  'NR338': unique(['青馬大橋', '青嶼幹線', '青衣西北交匯處', '長青公路', '長青隧道', '青葵公路', '西九龍公路', '西區海底隧道', '干諾道西天橋', '干諾道中天橋', '中環及灣仔繞道', '民寶街', '金融街', '民祥街', '民耀街', '民光街', '民耀街', '民祥街', '干諾道中西行', '干諾道西']),
+  '230R': unique(['雅翔道', '柯士甸道西', '廣東道', '梳士巴利道', '九龍公園徑', '佐敦道', '連翔道', '海輝道', '深旺道', '東京街西', '西九龍公路', '青葵公路', '長青隧道', '長青公路', '青衣西北交匯處', '青嶼幹線', '欽州街西', '青馬大橋'])
 };
 
 const CurrentTimeBar: React.FC<{ now: Date; lang: Language; displayType: DayType; themeColor: string; fontSize: FontSize }> = ({ now, lang, displayType, themeColor, fontSize }) => {
@@ -413,9 +425,9 @@ const HeroCountdown: React.FC<{ minutes: number; seconds: number; departureTime:
 
 interface CrossRouteButtonProps { label: string; onAction: () => void; Icon: React.ElementType; }
 
-const UpcomingSchedule: React.FC<{ items: ScheduleItem[]; lang: Language; isFullList: boolean; crossRoute?: CrossRouteButtonProps | null; routeId: string; directionIndex: number; canExtend: boolean; isExtendedView: boolean; onToggleView: () => void; collapseLabel: string; expandLabel: string; themeColor: string; fontSize: FontSize; currentTimeSeconds: number; activeType: TransportType; }> = ({ items, lang, isFullList, crossRoute, routeId, directionIndex, canExtend, isExtendedView, onToggleView, collapseLabel, expandLabel, themeColor, fontSize, currentTimeSeconds, activeType }) => {
+const UpcomingSchedule: React.FC<{ items: ScheduleItem[]; lang: Language; isFullList: boolean; crossRoute?: CrossRouteButtonProps | null; routeId: string; directionIndex: number; canExtend: boolean; isExtendedView: boolean; onToggleView: () => void; collapseLabel: string; expandLabel: string; themeColor: string; fontSize: FontSize; currentTimeSeconds: number; activeType: TransportType; showRealTimeButton?: boolean; isRealTime?: boolean; onToggleRealTime?: () => void; }> = ({ items, lang, isFullList, crossRoute, routeId, directionIndex, canExtend, isExtendedView, onToggleView, collapseLabel, expandLabel, themeColor, fontSize, currentTimeSeconds, activeType, showRealTimeButton, isRealTime, onToggleRealTime }) => {
   const t = translations[lang];
-  if (items.length === 0) return null;
+  if (items.length === 0 && !showRealTimeButton) return null;
   const headerSize = fontSize === 'large' ? 'text-xs' : 'text-[10px]';
   const buttonTextSize = fontSize === 'large' ? 'text-xs' : 'text-[10px]';
   const stickyHeaderSize = fontSize === 'large' ? 'text-sm' : 'text-xs';
@@ -438,11 +450,15 @@ const UpcomingSchedule: React.FC<{ items: ScheduleItem[]; lang: Language; isFull
         <div className="flex items-center gap-3">
           <h3 className={`${headerSize} font-black text-slate-400 uppercase tracking-[0.2em]`}> {isFullList ? t.fullSchedule : t.laterDepartures} </h3>
           {canExtend && ( <button onClick={onToggleView} className={`px-2 py-1 rounded-md bg-slate-100 ${buttonTextSize} font-bold text-slate-500 hover:bg-slate-200 transition-colors flex items-center gap-1`}> {isExtendedView ? <> <ArrowUpCircle size={10} /> {collapseLabel} </> : <> <ArrowDownCircle size={10} /> {expandLabel} </> } </button> )}
+          {showRealTimeButton && ( <button onClick={onToggleRealTime} className={`ml-2 px-2 py-1 rounded-md bg-slate-100 ${buttonTextSize} font-bold text-slate-500 hover:bg-slate-200 transition-colors flex items-center gap-1`}> {isRealTime ? t.switchToSchedule : t.realTimeETA} </button> )}
         </div>
         {crossRoute && ( <button onClick={crossRoute.onAction} className="flex items-center space-x-2 bg-slate-200/60 hover:bg-slate-200 active:bg-slate-300 px-3 py-1.5 rounded-xl transition-all"> <crossRoute.Icon size={14} className="text-slate-600" /> <span className={`${buttonTextSize} font-bold text-slate-600`}>{crossRoute.label}</span> <ChevronRight size={12} className="text-slate-400" /> </button> )}
       </div>
       <div className="bg-white rounded-[24px] overflow-hidden shadow-xl shadow-slate-200/50 border border-slate-100">
-        {items.map((item, idx) => {
+        {items.length === 0 && isRealTime ? (
+             <div className="p-8 text-center text-slate-400 font-bold text-sm">{t.noData}</div>
+        ) : (
+        items.map((item, idx) => {
           const showDateHeader = idx === 0 || item.dateLabel !== items[idx - 1].dateLabel;
           return (
             <React.Fragment key={`${item.timestamp}-${idx}`}>
@@ -453,13 +469,14 @@ const UpcomingSchedule: React.FC<{ items: ScheduleItem[]; lang: Language; isFull
                   <span className={`mono ${timeSize} font-black tracking-tighter tabular-nums text-slate-800`}>{item.time}</span>
                 </div>
                 <div className="flex items-center gap-3">
-                    {idx === 0 && !isFullList && activeType === TransportType.BUS && ( <span className={`${countdownTextSize} font-bold text-slate-400 tabular-nums whitespace-nowrap`}> {getTimeDiffLabel(item.timestamp, currentTimeSeconds, lang)} </span> )}
+                    {idx === 0 && !isFullList && (activeType === TransportType.BUS || isRealTime) && ( <span className={`${countdownTextSize} font-bold text-slate-400 tabular-nums whitespace-nowrap`}> {getTimeDiffLabel(item.timestamp, currentTimeSeconds, lang)} </span> )}
                     <div className="flex flex-col items-end gap-1"> {item.badges.map((badge, bIdx) => ( <span key={bIdx} className={`${badgeSize} font-black px-3 py-1 rounded-full uppercase tracking-widest ${badge.className}`}> {badge.text} </span> ))} </div>
                 </div>
               </div>
             </React.Fragment>
           );
-        })}
+        })
+        )}
       </div>
     </div>
   );
@@ -557,7 +574,7 @@ const SettingsModal: React.FC<{ isOpen: boolean; onClose: () => void; lang: Lang
            <div> <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-5">{t.selectLanguage}</label> <div className="grid grid-cols-2 gap-4"> {(['en', 'zh'] as Language[]).map((l) => ( <button key={l} onClick={() => onLangChange(l)} className={`p-5 rounded-3xl border-2 transition-all text-left ${ lang === l ? `border-${themeColor}-600 bg-${themeColor}-50/50 text-${themeColor}-700 shadow-lg shadow-${themeColor}-100` : 'border-slate-100 text-slate-400' }`} > <div className="font-black text-lg leading-none mb-2">{l === 'en' ? 'English' : '繁體中文'}</div> <div className="text-[10px] uppercase font-bold opacity-60">{l === 'en' ? 'Default' : 'Traditional'}</div> </button> ))} </div> </div>
            <div> <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-5">{t.scheduleType}</label> <div className="grid grid-cols-2 gap-3"> {(['auto', 'weekday', 'saturday', 'sunday'] as ScheduleOverride[]).map((mode) => ( <button key={mode} onClick={() => onScheduleOverrideChange(mode)} className={`flex items-center justify-between p-4 rounded-3xl border-2 transition-all ${ scheduleOverride === mode ? `border-${themeColor}-600 bg-${themeColor}-50/50 text-${themeColor}-700 shadow-lg shadow-${themeColor}-100` : 'border-slate-100 text-slate-400' }`} > <span className="font-black text-sm">{t[mode as keyof typeof t] as string}</span> {scheduleOverride === mode && <Check size={16} strokeWidth={3} />} </button> ))} </div> </div>
         </div>
-        <div className="mt-12 pb-6 sm:pb-0"> <div className="text-center text-[10px] text-slate-300 font-bold mb-2 uppercase tracking-widest"> Version: 1.0 &bull; {updateLabel}: 2026/2/19 </div> <button onClick={onClose} className={`w-full py-5 bg-${themeColor}-600 text-white font-black text-lg rounded-3xl shadow-2xl shadow-${themeColor}-200 active:scale-95 transition-all`}> {t.close} </button> </div>
+        <div className="mt-12 pb-6 sm:pb-0"> <div className="text-center text-[10px] text-slate-300 font-bold mb-2 uppercase tracking-widest"> Version: 2.0 &bull; {updateLabel}: 2026/2/22 </div> <button onClick={onClose} className={`w-full py-5 bg-${themeColor}-600 text-white font-black text-lg rounded-3xl shadow-2xl shadow-${themeColor}-200 active:scale-95 transition-all`}> {t.close} </button> </div>
       </div>
     </div>
   );
@@ -583,6 +600,7 @@ export default function App() {
   const [isTrafficModalOpen, setIsTrafficModalOpen] = useState(false);
   const [selectedRoute, setSelectedRoute] = useState<Route>(routes.find(r => r.type === TransportType.BUS) || routes[0]);
   const [directionIndex, setDirectionIndex] = useState(0);
+  const [selectedStopIndex, setSelectedStopIndex] = useState(0);
   const [now, setNow] = useState(new Date());
   const [rawTrafficNews, setRawTrafficNews] = useState<string[]>([]);
   const [userReports, setUserReports] = useState<UserReport[]>(() => {
@@ -593,6 +611,10 @@ export default function App() {
   });
   const [trafficLastUpdate, setTrafficLastUpdate] = useState<Date | null>(null);
   const [syncStatus, setSyncStatus] = useState<'success' | 'error' | 'syncing'>('syncing');
+  const [isRealTimeMode, setIsRealTimeMode] = useState(false);
+  const [realTimeData, setRealTimeData] = useState<any[]>([]);
+  const [realTimeLoading, setRealTimeLoading] = useState(false);
+  const [realTimeLastUpdate, setRealTimeLastUpdate] = useState<Date | null>(null);
 
   useEffect(() => {
     let isMounted = true; 
@@ -736,6 +758,53 @@ export default function App() {
     return () => { isMounted = false; clearInterval(interval); };
   }, []);
 
+  useEffect(() => {
+    if (isRealTimeMode && selectedRoute.id === '230R') {
+      const fetchRealTimeETA = async () => {
+        setRealTimeLoading(true);
+        try {
+          let stopId = '';
+          let destEn = '';
+          if (directionIndex === 0) {
+             stopId = 'E37FAF099C26C878';
+             destEn = 'KOWLOON STATION';
+          } else {
+             const stopIds = [
+                 '68A0FA3CC69206CC',
+                 '576538E1395C8508',
+                 '450A96AF1DA8E41C',
+                 '83B921ED81BE55A9'
+             ];
+             stopId = stopIds[selectedStopIndex] || stopIds[0];
+             destEn = 'MA WAN (PAK YAN ROAD)';
+          }
+
+          const res = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/eta/${stopId}/230R/1`);
+          const data = await res.json();
+          if (data && data.data) {
+             const validEtas = data.data.filter((item: any) =>
+                 item.dest_en === destEn && item.eta
+             ).map((item: any) => ({
+                 time: new Date(item.eta).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false }),
+                 timestamp: new Date(item.eta).getTime() / 1000,
+                 eta: item.eta
+             })).sort((a: any, b: any) => a.timestamp - b.timestamp);
+             setRealTimeData(validEtas);
+             setRealTimeLastUpdate(new Date());
+          }
+        } catch (e) {
+          console.error("ETA fetch failed", e);
+        } finally {
+          setRealTimeLoading(false);
+        }
+      };
+      
+      fetchRealTimeETA();
+      const interval = setInterval(fetchRealTimeETA, 60000);
+      return () => clearInterval(interval);
+    }
+  }, [isRealTimeMode, selectedRoute.id, directionIndex, selectedStopIndex]);
+
   const trafficNews = useMemo<TrafficNewsData>(() => {
      if (activeType === TransportType.FERRY) return { status: 'normal', details: { en: [], zh: [] } };
      const routeId = selectedRoute.id;
@@ -838,21 +907,38 @@ export default function App() {
   const handleTypeChange = (newType: TransportType) => { if (newType === activeType) return; setActiveType(newType); const typeRoutes = routes.filter(r => r.type === newType); const sorted = [...typeRoutes].sort((a, b) => { const aFav = favorites.includes(a.id); const bFav = favorites.includes(b.id); if (aFav === bFav) return 0; return aFav ? -1 : 1; }); if (sorted.length > 0) { setSelectedRoute(sorted[0]); setDirectionIndex(0); setIsExtendedView(false); } };
   const handleSelectRoute = (route: Route) => { setSelectedRoute(route); setDirectionIndex(0); setIsExtendedView(false); };
   const handleSwitchRoute = (routeId: string, dirIndex: number = 0) => { const target = routes.find(r => r.id === routeId); if (target) { setActiveType(target.type); setSelectedRoute(target); setDirectionIndex(dirIndex); setIsExtendedView(false); } };
+  
+  useEffect(() => {
+    const currentDirection = selectedRoute.directions[directionIndex];
+    if (currentDirection?.stops && currentDirection.stops.length > 0) {
+      const defaultIndex = currentDirection.stops.findIndex(s => s.isDefault);
+      setSelectedStopIndex(defaultIndex >= 0 ? defaultIndex : 0);
+    } else {
+      setSelectedStopIndex(0);
+    }
+  }, [selectedRoute, directionIndex]);
+
   useEffect(() => { const timer = setInterval(() => { setNow(new Date()); }, 1000); return () => clearInterval(timer); }, []);
   const handleToggleOverride = () => { const modes: ScheduleOverride[] = ['auto', 'weekday', 'saturday', 'sunday']; const nextIdx = (modes.indexOf(scheduleOverride) + 1) % modes.length; setScheduleOverride(modes[nextIdx]); };
   const detectedDayType = useMemo(() => getDayType(now), [now]);
   const effectiveDayType = scheduleOverride === 'auto' ? detectedDayType : (scheduleOverride as DayType);
-  const GROUP_A = ['NR331', 'NR331S', 'NR334', 'Ferry-Central']; 
+  const GROUP_A = ['NR331', 'NR331S', 'NR334', 'Ferry-Central', '230R']; 
   const GROUP_B = ['NR330', 'NR332', 'NR338'];
   const EXTENDED_VIEW_ROUTES = [...GROUP_A, ...GROUP_B];
   const canExtend = EXTENDED_VIEW_ROUTES.includes(selectedRoute.id);
   const { currentCountdown, nextDepartures, showFullSchedule, collapseLabel, expandLabel } = useMemo(() => {
     const t = translations[lang];
     const direction = selectedRoute.directions[directionIndex];
+    
+    const stopOffset = direction.stops && direction.stops.length > 0 
+      ? (direction.stops[selectedStopIndex]?.offsetMinutes || 0) 
+      : 0;
+    const applyOffset = (times: string[]) => times.map(tStr => addMinutesToTime(tStr, stopOffset));
+
     let currentServiceDayType = effectiveDayType;
     let shouldUseAdjustedDate = false;
     if (scheduleOverride === 'auto') { const adjustedDate = new Date(now); if (adjustedDate.getHours() < 6) adjustedDate.setDate(adjustedDate.getDate() - 1); currentServiceDayType = getDayType(adjustedDate); shouldUseAdjustedDate = adjustedDate.getDate() !== now.getDate(); }
-    const departures = direction.departures[currentServiceDayType] || [];
+    const departures = applyOffset(direction.departures[currentServiceDayType] || []);
     const currentTimeSeconds = getSecondsSinceStartOfDay(now);
     const nextTime = departures.find(tStr => parseTimeToSeconds(tStr) > currentTimeSeconds);
     const getServiceDayDepartures = (dayOffset: number) => {
@@ -861,7 +947,7 @@ export default function App() {
              const targetDate = new Date(baseDate); targetDate.setDate(targetDate.getDate() + dayOffset);
              const type = getDayType(targetDate);
              const formatter = new Intl.DateTimeFormat(lang === 'zh' ? 'zh-HK' : 'en-GB', { weekday: 'short', month: 'numeric', day: 'numeric' });
-             return { times: direction.departures[type] || [], dateLabel: formatter.format(targetDate), targetDate, formatter };
+             return { times: applyOffset(direction.departures[type] || []), dateLabel: formatter.format(targetDate), targetDate, formatter };
         }
         return { times: departures, dateLabel: `Day +${dayOffset}`, targetDate: null, formatter: null }; 
     };
@@ -919,8 +1005,40 @@ export default function App() {
         countdownBadges = getBadges(countdown.departureTime, isLastForCountdown);
     }
     let collapseLabel = t.show12h; let expandLabel = t.show48h; if (GROUP_B.includes(selectedRoute.id)) collapseLabel = t.show24h;
+
+    if (isRealTimeMode && selectedRoute.id === '230R') {
+        let rtCountdown: CountdownState = { minutes: 0, seconds: 0, departureTime: '--:--', isAvailable: false };
+        let rtUpcoming: ScheduleItem[] = [];
+        
+        if (realTimeData.length > 0) {
+            const first = realTimeData[0];
+            // Use epoch seconds for accurate countdown difference
+            const nowEpoch = Math.floor(now.getTime() / 1000);
+            const diff = first.timestamp - nowEpoch;
+            const safeDiff = Math.max(0, diff);
+            
+            rtCountdown = {
+                minutes: Math.floor(safeDiff / 60),
+                seconds: Math.floor(safeDiff % 60),
+                departureTime: first.time,
+                isAvailable: true
+            };
+            
+            rtUpcoming = realTimeData.slice(1).map((item, idx) => ({
+                time: item.time,
+                // Convert to service seconds for consistency with UpcomingSchedule
+                timestamp: getSecondsSinceStartOfDay(new Date(item.eta)),
+                badges: []
+            }));
+        } else {
+             rtCountdown = { minutes: 0, seconds: 0, departureTime: t.noData, isAvailable: false };
+        }
+        
+        return { currentCountdown: { ...rtCountdown, badges: [] }, nextDepartures: rtUpcoming, showFullSchedule: false, collapseLabel, expandLabel };
+    }
+
     return { currentCountdown: { ...countdown, badges: countdownBadges }, nextDepartures: upcoming, showFullSchedule: isFullList, collapseLabel, expandLabel };
-  }, [now, selectedRoute, directionIndex, effectiveDayType, scheduleOverride, isExtendedView, canExtend, lang, themeColor, fontSize]);
+  }, [now, selectedRoute, directionIndex, effectiveDayType, scheduleOverride, isExtendedView, canExtend, lang, themeColor, fontSize, selectedStopIndex, isRealTimeMode, realTimeData]);
 
   const crossRouteData = useMemo(() => {
       const t = translations[lang];
@@ -939,8 +1057,36 @@ export default function App() {
       <Header selectedRoute={selectedRoute} onSelectRoute={handleSelectRoute} filteredRoutes={filteredRoutes} lang={lang} scheduleOverride={scheduleOverride} onToggleOverride={handleToggleOverride} favorites={favorites} onToggleFavorite={toggleFavorite} themeColor={themeColor} fontSize={fontSize} />
       <main className="animate-in fade-in slide-in-from-bottom-2 duration-700">
         <SegmentedControl directions={selectedRoute.directions} selectedIndex={directionIndex} onSelect={setDirectionIndex} lang={lang} themeColor={themeColor} fontSize={fontSize} />
+        {selectedRoute.directions[directionIndex].stops && selectedRoute.directions[directionIndex].stops.length > 0 && (
+          <div className="mx-4 mt-2 overflow-x-auto custom-scrollbar pb-2">
+            <div className="flex items-center gap-1 mb-1.5 px-1">
+               <MapPin size={12} className="text-slate-400" />
+               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{translations[lang].departFrom}</span>
+            </div>
+            <div className="flex space-x-2">
+              {selectedRoute.directions[directionIndex].stops.map((stop, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setSelectedStopIndex(idx)}
+                  className={`px-3 py-1.5 rounded-xl ${fontSize === 'large' ? 'text-sm' : 'text-xs'} font-bold whitespace-nowrap transition-all ${
+                    selectedStopIndex === idx
+                      ? `bg-${themeColor}-100 text-${themeColor}-700 border border-${themeColor}-200 shadow-sm`
+                      : 'bg-white text-slate-500 border border-slate-100'
+                  }`}
+                >
+                  {stop.name[lang]}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         <HeroCountdown {...currentCountdown} badges={currentCountdown.badges || []} lang={lang} themeColor={themeColor} fontSize={fontSize} transportType={activeType} onShowTraffic={() => setIsTrafficModalOpen(true)} trafficStatus={trafficNews.status} />
-        <UpcomingSchedule items={nextDepartures} lang={lang} isFullList={showFullSchedule} crossRoute={crossRouteData} routeId={selectedRoute.id} directionIndex={directionIndex} canExtend={canExtend} isExtendedView={isExtendedView} onToggleView={() => setIsExtendedView(!isExtendedView)} collapseLabel={collapseLabel} expandLabel={expandLabel} themeColor={themeColor} fontSize={fontSize} currentTimeSeconds={currentTimeSeconds} activeType={activeType} />
+        <UpcomingSchedule items={nextDepartures} lang={lang} isFullList={showFullSchedule} crossRoute={crossRouteData} routeId={selectedRoute.id} directionIndex={directionIndex} canExtend={canExtend} isExtendedView={isExtendedView} onToggleView={() => setIsExtendedView(!isExtendedView)} collapseLabel={collapseLabel} expandLabel={expandLabel} themeColor={themeColor} fontSize={fontSize} currentTimeSeconds={currentTimeSeconds} activeType={activeType} showRealTimeButton={selectedRoute.id === '230R'} isRealTime={isRealTimeMode} onToggleRealTime={() => setIsRealTimeMode(!isRealTimeMode)} />
+        {isRealTimeMode && selectedRoute.id === '230R' && (
+          <div className="text-center text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-4 mb-8">
+            {translations[lang].dataSource}
+          </div>
+        )}
       </main>
       <Footer currentType={activeType} onTypeChange={handleTypeChange} lang={lang} onOpenSettings={() => setIsSettingsOpen(true)} themeColor={themeColor} fontSize={fontSize} />
       <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} lang={lang} onLangChange={setLang} scheduleOverride={scheduleOverride} onScheduleOverrideChange={setScheduleOverride} themeMode={themeMode} onThemeModeChange={setThemeMode} themeColor={themeColor} fontSize={fontSize} onFontSizeChange={setFontSize} />

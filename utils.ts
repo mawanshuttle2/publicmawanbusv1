@@ -91,3 +91,12 @@ export const findNextDepartures = (departures: string[], currentTimeInSeconds: n
   const futureDepartures = departures.filter(time => parseTimeToSeconds(time) > currentTimeInSeconds);
   return futureDepartures.slice(0, count);
 };
+
+export const addMinutesToTime = (timeStr: string, minutesToAdd: number): string => {
+  const [hours, minutes] = timeStr.split(':').map(Number);
+  let totalMinutes = hours * 60 + minutes + minutesToAdd;
+  let newHours = Math.floor(totalMinutes / 60);
+  const newMinutes = totalMinutes % 60;
+  newHours = newHours % 24;
+  return `${String(newHours).padStart(2, '0')}:${String(newMinutes).padStart(2, '0')}`;
+};

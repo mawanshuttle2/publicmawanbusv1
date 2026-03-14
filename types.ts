@@ -16,6 +16,8 @@ export interface LocalizedString {
 
 export interface Stop {
   name: LocalizedString;
+  offsetMinutes?: number;
+  isDefault?: boolean;
 }
 
 export interface ScheduleData {
