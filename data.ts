@@ -462,7 +462,7 @@ export const routes: Route[] = [
         }
       },
       {
-        label: { en: 'To Park Island', zh: '往珀麗灣' },
+        label: { en: 'To Ma Wan', zh: '往馬灣' },
         from: { en: 'Tsuen Wan', zh: '荃灣' },
         to: { en: 'Park Island', zh: '珀麗灣' },
         stops: [],
@@ -608,7 +608,7 @@ export const routes: Route[] = [
         }
       },
       {
-        label: { en: 'To Park Island', zh: '往珀麗灣' },
+        label: { en: 'To Ma Wan', zh: '往馬灣' },
         from: { en: 'Tsuen Wan West MTR', zh: '荃灣西站' },
         to: { en: 'Park Island', zh: '珀麗灣' },
         stops: [],
