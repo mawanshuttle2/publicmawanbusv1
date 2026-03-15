@@ -9,12 +9,13 @@ import {
   addMinutesToTime,
   DayType
 } from './utils';
-import { Route, TransportType, Direction, CountdownState, Language, ScheduleOverride, ThemeMode, FontSize } from './types';
+import { Route, TransportType, Direction, CountdownState, Language, ScheduleOverride, ThemeMode, FontSize, RouteNotice } from './types';
 
 // --- CONFIGURATION START ---
 const SHEET_ID = '1FjL88rkpzKIGlrfyD9SLvyHv0ePjsGpF1b5ftqlw39g';
 const GOOGLE_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzG8_7V19QzMVozl2igG3cRulSdsxA-TaVRu4RM5rX8VrF1u5HdQ6_o4g-jNUWN2LY-/exec';
 const EXTERNAL_REPORT_URL = 'https://forms.gle/6MdPfbQQsRhRFnrP9';
+const NOTICES_SHEET_ID = '1HPQzVotI4JwDSZHulENYg8015pSWJa9gufNaPq_ImDo';
 
 const FORM_VALUE_MAPPING = {
   issue: {
@@ -56,12 +57,12 @@ const translations = {
     sunday: 'Holiday/Sunday',
     forceMode: 'Mode: ',
     fullSchedule: 'Full Schedule',
-    switchFerryToCentral: 'Ferry (To Central)',
-    switchFerryToPI: 'Ferry (To Park Island)',
-    switchBusToCentral: 'Bus (To Central)',
-    switchBusToPI: 'Bus (To Park Island)',
-    switchFerryToTW: 'Ferry (To Tsuen Wan)',
-    switchBusToTWWest: 'Bus (To TW West)',
+    switchFerryToCentral: 'To Central',
+    switchFerryToPI: 'To Park Island',
+    switchBusToCentral: 'To Central',
+    switchBusToPI: 'To Park Island',
+    switchFerryToTW: 'To Tsuen Wan',
+    switchBusToTWWest: 'To TW West',
     viaHZMB: 'via HZMB',
     normal: 'Normal',
     lastDeparture: 'Last Departure',
@@ -116,7 +117,9 @@ const translations = {
     realTimeETA: 'Real-time ETA',
     switchToSchedule: 'Switch to Schedule',
     noData: 'No Data',
-    dataSource: 'Data from data.gov.hk, refreshes every 60s'
+    dataSource: 'Data from data.gov.hk, refreshes every 60s',
+    specialNotice: 'Special Notice',
+    doNotShowAgain: 'Do not show this message again'
   },
   zh: {
     nextArrival: '開出時間剩餘',
@@ -141,12 +144,12 @@ const translations = {
     sunday: '紅日/星期日',
     forceMode: '模式: ',
     fullSchedule: '全日班次',
-    switchFerryToCentral: '渡輪 (往中環)',
-    switchFerryToPI: '渡輪 (往珀麗灣)',
-    switchBusToCentral: '巴士 (往中環)',
-    switchBusToPI: '巴士 (往珀麗灣)',
-    switchFerryToTW: '渡輪 (往荃灣)',
-    switchBusToTWWest: '巴士 (往荃灣西)',
+    switchFerryToCentral: '往中環',
+    switchFerryToPI: '往珀麗灣',
+    switchBusToCentral: '往中環',
+    switchBusToPI: '往珀麗灣',
+    switchFerryToTW: '往荃灣',
+    switchBusToTWWest: '往荃灣西',
     viaHZMB: '經港珠澳',
     normal: '不經港珠澳',
     lastDeparture: '尾班',
@@ -201,7 +204,9 @@ const translations = {
     realTimeETA: '實時班次',
     switchToSchedule: '切換至時間表',
     noData: '暫無數據',
-    dataSource: '數據由資料一線通提供，每60秒更新'
+    dataSource: '數據由資料一線通提供，每60秒更新',
+    specialNotice: '特別通告',
+    doNotShowAgain: '不再顯示此訊息'
   }
 };
 
@@ -452,7 +457,7 @@ const UpcomingSchedule: React.FC<{ items: ScheduleItem[]; lang: Language; isFull
           {canExtend && ( <button onClick={onToggleView} className={`px-2 py-1 rounded-md bg-slate-100 ${buttonTextSize} font-bold text-slate-500 hover:bg-slate-200 transition-colors flex items-center gap-1`}> {isExtendedView ? <> <ArrowUpCircle size={10} /> {collapseLabel} </> : <> <ArrowDownCircle size={10} /> {expandLabel} </> } </button> )}
           {showRealTimeButton && ( <button onClick={onToggleRealTime} className={`ml-2 px-2 py-1 rounded-md bg-slate-100 ${buttonTextSize} font-bold text-slate-500 hover:bg-slate-200 transition-colors flex items-center gap-1`}> {isRealTime ? t.switchToSchedule : t.realTimeETA} </button> )}
         </div>
-        {crossRoute && ( <button onClick={crossRoute.onAction} className="flex items-center space-x-2 bg-slate-200/60 hover:bg-slate-200 active:bg-slate-300 px-3 py-1.5 rounded-xl transition-all"> <crossRoute.Icon size={14} className="text-slate-600" /> <span className={`${buttonTextSize} font-bold text-slate-600`}>{crossRoute.label}</span> <ChevronRight size={12} className="text-slate-400" /> </button> )}
+        {crossRoute && ( <button onClick={crossRoute.onAction} className="flex items-center space-x-1.5 bg-slate-200/60 hover:bg-slate-200 active:bg-slate-300 px-2.5 py-1 rounded-lg transition-all"> <crossRoute.Icon size={14} className="text-slate-600" /> <span className={`${buttonTextSize} font-bold text-slate-600`}>{crossRoute.label}</span> <ChevronRight size={12} className="text-slate-400" /> </button> )}
       </div>
       <div className="bg-white rounded-[24px] overflow-hidden shadow-xl shadow-slate-200/50 border border-slate-100">
         {items.length === 0 && isRealTime ? (
@@ -574,7 +579,7 @@ const SettingsModal: React.FC<{ isOpen: boolean; onClose: () => void; lang: Lang
            <div> <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-5">{t.selectLanguage}</label> <div className="grid grid-cols-2 gap-4"> {(['en', 'zh'] as Language[]).map((l) => ( <button key={l} onClick={() => onLangChange(l)} className={`p-5 rounded-3xl border-2 transition-all text-left ${ lang === l ? `border-${themeColor}-600 bg-${themeColor}-50/50 text-${themeColor}-700 shadow-lg shadow-${themeColor}-100` : 'border-slate-100 text-slate-400' }`} > <div className="font-black text-lg leading-none mb-2">{l === 'en' ? 'English' : '繁體中文'}</div> <div className="text-[10px] uppercase font-bold opacity-60">{l === 'en' ? 'Default' : 'Traditional'}</div> </button> ))} </div> </div>
            <div> <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-5">{t.scheduleType}</label> <div className="grid grid-cols-2 gap-3"> {(['auto', 'weekday', 'saturday', 'sunday'] as ScheduleOverride[]).map((mode) => ( <button key={mode} onClick={() => onScheduleOverrideChange(mode)} className={`flex items-center justify-between p-4 rounded-3xl border-2 transition-all ${ scheduleOverride === mode ? `border-${themeColor}-600 bg-${themeColor}-50/50 text-${themeColor}-700 shadow-lg shadow-${themeColor}-100` : 'border-slate-100 text-slate-400' }`} > <span className="font-black text-sm">{t[mode as keyof typeof t] as string}</span> {scheduleOverride === mode && <Check size={16} strokeWidth={3} />} </button> ))} </div> </div>
         </div>
-        <div className="mt-12 pb-6 sm:pb-0"> <div className="text-center text-[10px] text-slate-300 font-bold mb-2 uppercase tracking-widest"> Version: 2.0 &bull; {updateLabel}: 2026/3/14 </div> <button onClick={onClose} className={`w-full py-5 bg-${themeColor}-600 text-white font-black text-lg rounded-3xl shadow-2xl shadow-${themeColor}-200 active:scale-95 transition-all`}> {t.close} </button> </div>
+        <div className="mt-12 pb-6 sm:pb-0"> <div className="text-center text-[10px] text-slate-300 font-bold mb-2 uppercase tracking-widest"> Version: 2.5 &bull; {updateLabel}: 2026/3/15 </div> <button onClick={onClose} className={`w-full py-5 bg-${themeColor}-600 text-white font-black text-lg rounded-3xl shadow-2xl shadow-${themeColor}-200 active:scale-95 transition-all`}> {t.close} </button> </div>
       </div>
     </div>
   );
@@ -615,6 +620,19 @@ export default function App() {
   const [realTimeData, setRealTimeData] = useState<any[]>([]);
   const [realTimeLoading, setRealTimeLoading] = useState(false);
   const [realTimeLastUpdate, setRealTimeLastUpdate] = useState<Date | null>(null);
+  const [notices, setNotices] = useState<RouteNotice[]>([]);
+  const [dismissedNotices, setDismissedNotices] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('dismissedNotices');
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
+  const [activeNotice, setActiveNotice] = useState<RouteNotice | null>(null);
+  const [sessionDismissedNotices, setSessionDismissedNotices] = useState<string[]>([]);
+
+  useEffect(() => {
+    setSessionDismissedNotices([]);
+  }, [selectedRoute.id]);
 
   useEffect(() => {
     let isMounted = true; 
@@ -752,39 +770,233 @@ export default function App() {
         }
     };
 
-    const fetchAll = () => { fetchRTHK(); fetchUserReports(); };
+    const fetchNotices = async () => {
+        if (!NOTICES_SHEET_ID) return;
+        const timestamp = Date.now();
+        const csvExportUrl = `https://docs.google.com/spreadsheets/d/${NOTICES_SHEET_ID}/export?format=csv&cachebust=${timestamp}`;
+        const strategies = [
+            `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(csvExportUrl)}`,
+            `https://api.allorigins.win/get?url=${encodeURIComponent(csvExportUrl)}`
+        ];
+
+        let csvData = "";
+        for (const proxy of strategies) {
+            try {
+                const res = await fetch(proxy);
+                if (!res.ok) continue;
+                csvData = proxy.includes('allorigins') ? (await res.json()).contents : await res.text();
+                if (csvData && csvData.length > 30) break;
+            } catch (e) {}
+        }
+
+        if (csvData && csvData.length > 30) {
+            const parseCSV = (text: string) => {
+                const result = [];
+                let row = [];
+                let inQuotes = false;
+                let val = '';
+                for (let i = 0; i < text.length; i++) {
+                    const char = text[i];
+                    if (char === '"') {
+                        if (inQuotes && text[i+1] === '"') {
+                            val += '"';
+                            i++;
+                        } else {
+                            inQuotes = !inQuotes;
+                        }
+                    } else if (char === ',' && !inQuotes) {
+                        row.push(val);
+                        val = '';
+                    } else if (char === '\n' && !inQuotes) {
+                        row.push(val);
+                        result.push(row);
+                        row = [];
+                        val = '';
+                    } else if (char === '\r' && !inQuotes) {
+                        if (text[i+1] === '\n') i++;
+                        row.push(val);
+                        result.push(row);
+                        row = [];
+                        val = '';
+                    } else {
+                        val += char;
+                    }
+                }
+                row.push(val);
+                if (row.length > 0 && row.some(c => c.trim().length > 0)) {
+                    result.push(row);
+                }
+                return result;
+            };
+
+            const allRows = parseCSV(csvData).filter(row => row.some(cell => cell.trim().length > 0));
+            if (allRows.length === 0) return;
+
+            const headers = allRows[0].map(c => c.trim().toLowerCase());
+            const hasTimestampHeader = headers.some(h => h.includes('timestamp') || h.includes('時間'));
+            const dataRows = hasTimestampHeader ? allRows.slice(1) : allRows;
+            
+            let colIdx = {
+                timestamp: headers.findIndex(h => h.includes('timestamp') || h.includes('時間')),
+                message: headers.findIndex(h => h.includes('message') || h.includes('訊息') || h.includes('內容')),
+                postingDate: headers.findIndex(h => h.includes('posting date') || h.includes('日期')),
+                postingTime: headers.findIndex(h => h.includes('posting time') || h.includes('發佈時間') || h.includes('開始')),
+                deleteTime: headers.findIndex(h => h.includes('delete time') || h.includes('刪除時間') || h.includes('結束')),
+                route: headers.findIndex(h => h.includes('route') || h.includes('路線'))
+            };
+
+            // Fallback to fixed indices if headers are not found
+            if (colIdx.timestamp === -1) colIdx.timestamp = 0;
+            if (colIdx.message === -1) colIdx.message = 1;
+            if (colIdx.postingDate === -1) colIdx.postingDate = 2;
+            if (colIdx.postingTime === -1) colIdx.postingTime = 3;
+            if (colIdx.deleteTime === -1) colIdx.deleteTime = 4;
+            if (colIdx.route === -1) colIdx.route = 5;
+
+            const parseDate = (dStr: string, baseDateStr?: string) => {
+                try {
+                    if (!dStr) return new Date().toISOString();
+                    
+                    let normalizedStr = dStr.trim().replace(/上午\s*/g, 'AM ').replace(/下午\s*/g, 'PM ');
+                    // Move AM/PM to the end if it's at the beginning of the time
+                    normalizedStr = normalizedStr.replace(/(AM|PM)\s*(\d{1,2}:\d{2}(?::\d{2})?)/i, '$2 $1');
+
+                    if (baseDateStr) {
+                        let isPM = /PM/i.test(normalizedStr);
+                        let isAM = /AM/i.test(normalizedStr);
+                        
+                        const timeMatch = normalizedStr.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+                        if (timeMatch) {
+                            const baseDate = new Date(parseDate(baseDateStr));
+                            if (!isNaN(baseDate.getTime())) {
+                                let hours = parseInt(timeMatch[1], 10);
+                                const minutes = parseInt(timeMatch[2], 10);
+                                const seconds = timeMatch[3] ? parseInt(timeMatch[3], 10) : 0;
+                                
+                                if (isPM && hours < 12) hours += 12;
+                                if (isAM && hours === 12) hours = 0;
+                                
+                                baseDate.setHours(hours);
+                                baseDate.setMinutes(minutes);
+                                baseDate.setSeconds(seconds);
+                                return baseDate.toISOString();
+                            }
+                        } else if (normalizedStr.match(/^\d{4}$/)) {
+                            const hours = parseInt(normalizedStr.substring(0, 2), 10);
+                            const minutes = parseInt(normalizedStr.substring(2, 4), 10);
+                            const baseDate = new Date(parseDate(baseDateStr));
+                            if (!isNaN(baseDate.getTime())) {
+                                baseDate.setHours(hours);
+                                baseDate.setMinutes(minutes);
+                                baseDate.setSeconds(0);
+                                return baseDate.toISOString();
+                            }
+                        }
+                    }
+
+                    let ts = Date.parse(normalizedStr);
+                    if (!isNaN(ts)) return new Date(ts).toISOString();
+                    
+                    const parts = normalizedStr.split(/[/\s:-]/).filter(p => p.length > 0 && !/AM|PM/i.test(p));
+                    if (parts.length >= 3) {
+                        let d, m, y;
+                        if (parts[0].length === 4) { y = parseInt(parts[0]); m = parseInt(parts[1]) - 1; d = parseInt(parts[2]); } 
+                        else { d = parseInt(parts[0]); m = parseInt(parts[1]) - 1; y = parseInt(parts[2]); }
+                        if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
+                            let hours = parseInt(parts[3] || '0');
+                            let isPM = /PM/i.test(normalizedStr);
+                            let isAM = /AM/i.test(normalizedStr);
+                            if (isPM && hours < 12) hours += 12;
+                            if (isAM && hours === 12) hours = 0;
+                            const date = new Date(y, m, d, hours, parseInt(parts[4] || '0'), parseInt(parts[5] || '0'));
+                            if (!isNaN(date.getTime())) return date.toISOString();
+                        }
+                    }
+                } catch (e) {
+                    console.warn("Date parsing error", e);
+                }
+                return new Date().toISOString();
+            };
+
+            const parsedNotices = dataRows.map((cols: string[]) => {
+                if (cols.length < 5) return null;
+                
+                const formTimestamp = cols[colIdx.timestamp]?.trim();
+                const message = cols[colIdx.message]?.trim();
+                const postingDate = cols[colIdx.postingDate]?.trim();
+                const postingTime = cols[colIdx.postingTime]?.trim();
+                const deleteTime = cols[colIdx.deleteTime]?.trim();
+                const routeId = cols[colIdx.route]?.trim();
+                
+                if (!routeId || !message || !postingTime || !deleteTime) return null;
+
+                const baseDateToUse = postingDate ? postingDate : formTimestamp;
+
+                return {
+                    id: "notice_" + new Date(parseDate(formTimestamp)).getTime(),
+                    routeId: routeId,
+                    message: message,
+                    postingDateTime: parseDate(postingTime, baseDateToUse),
+                    deleteDateTime: parseDate(deleteTime, baseDateToUse)
+                };
+            }).filter((n: any): n is RouteNotice => n !== null);
+
+            if (isMounted) {
+                setNotices(parsedNotices);
+            }
+        }
+    };
+
+    const fetchAll = () => { fetchRTHK(); fetchUserReports(); fetchNotices(); };
     fetchAll();
-    const interval = setInterval(fetchAll, 60000); 
+    const interval = setInterval(fetchAll, 15000); 
     return () => { isMounted = false; clearInterval(interval); };
   }, []);
 
   useEffect(() => {
-    if (isRealTimeMode && selectedRoute.id === '230R') {
+    if (isRealTimeMode && (selectedRoute.id === '230R' || selectedRoute.id === 'NR331S')) {
       const fetchRealTimeETA = async () => {
         setRealTimeLoading(true);
         try {
           let stopId = '';
           let destEn = '';
-          if (directionIndex === 0) {
-             stopId = 'E37FAF099C26C878';
-             destEn = 'KOWLOON STATION';
-          } else {
-             const stopIds = [
-                 '68A0FA3CC69206CC',
-                 '576538E1395C8508',
-                 '450A96AF1DA8E41C',
-                 '83B921ED81BE55A9'
-             ];
-             stopId = stopIds[selectedStopIndex] || stopIds[0];
-             destEn = 'MA WAN (PAK YAN ROAD)';
+          let destTc = '';
+          let routeCode = selectedRoute.id === 'NR331S' ? '331S' : '230R';
+
+          if (selectedRoute.id === '230R') {
+            if (directionIndex === 0) {
+               stopId = 'E37FAF099C26C878';
+               destEn = 'KOWLOON STATION';
+            } else {
+               const stopIds = [
+                   '68A0FA3CC69206CC',
+                   '576538E1395C8508',
+                   '450A96AF1DA8E41C',
+                   '83B921ED81BE55A9'
+               ];
+               stopId = stopIds[selectedStopIndex] || stopIds[0];
+               destEn = 'MA WAN (PAK YAN ROAD)';
+            }
+          } else if (selectedRoute.id === 'NR331S') {
+            if (directionIndex === 0) {
+               stopId = '4B792EF191200C0D';
+               destTc = '荃灣西站';
+            } else {
+               stopId = 'A02CB1283981A937';
+               destTc = '馬灣(珀欣路)';
+            }
           }
 
-          const res = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/eta/${stopId}/230R/1`);
+          const res = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/eta/${stopId}/${routeCode}/1`);
           const data = await res.json();
           if (data && data.data) {
-             const validEtas = data.data.filter((item: any) =>
-                 item.dest_en === destEn && item.eta
-             ).map((item: any) => ({
+             const validEtas = data.data.filter((item: any) => {
+                 if (selectedRoute.id === '230R' && item.dest_en !== destEn) return false;
+                 if (selectedRoute.id === 'NR331S' && item.dest_tc !== destTc) return false;
+                 if (!item.eta) return false;
+                 const d = new Date(item.eta);
+                 return !isNaN(d.getTime());
+             }).map((item: any) => ({
                  time: new Date(item.eta).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false }),
                  timestamp: new Date(item.eta).getTime() / 1000,
                  eta: item.eta
@@ -805,6 +1017,48 @@ export default function App() {
     }
   }, [isRealTimeMode, selectedRoute.id, directionIndex, selectedStopIndex]);
 
+  useEffect(() => {
+    const nowTime = now.getTime();
+    let currentDismissed: string[] = [];
+    try {
+      const saved = localStorage.getItem('dismissedNotices');
+      if (saved) currentDismissed = JSON.parse(saved);
+    } catch {}
+
+    const validNotices = notices.filter(notice => {
+      const noticeRoute = notice.routeId.toLowerCase().trim();
+      const currentRouteId = selectedRoute.id.toLowerCase();
+      const currentRouteType = selectedRoute.type;
+      
+      let isRouteMatch = false;
+      if (noticeRoute === 'all') {
+          isRouteMatch = true;
+      } else if (noticeRoute === 'all bus' && currentRouteType === TransportType.BUS) {
+          isRouteMatch = true;
+      } else if (noticeRoute === 'all ferry' && currentRouteType === TransportType.FERRY) {
+          isRouteMatch = true;
+      } else if ((noticeRoute === 'tw ferry' || noticeRoute === 'tsuen wan ferry') && currentRouteId === 'ferry-tsuen-wan') {
+          isRouteMatch = true;
+      } else if ((noticeRoute === 'central ferry' || noticeRoute === 'central') && currentRouteId === 'ferry-central') {
+          isRouteMatch = true;
+      } else if (noticeRoute === currentRouteId) {
+          isRouteMatch = true;
+      }
+
+      const isNotDismissed = !currentDismissed.includes(notice.id);
+      const isNotSessionDismissed = !sessionDismissedNotices.includes(notice.id);
+      const postTime = new Date(notice.postingDateTime).getTime();
+      const deleteTime = new Date(notice.deleteDateTime).getTime();
+      const isWithinTime = nowTime >= postTime && nowTime <= deleteTime;
+      return isRouteMatch && isNotDismissed && isNotSessionDismissed && isWithinTime;
+    });
+
+    // Sort by postingDateTime descending (newest first)
+    validNotices.sort((a, b) => new Date(b.postingDateTime).getTime() - new Date(a.postingDateTime).getTime());
+
+    setActiveNotice(validNotices.length > 0 ? validNotices[0] : null);
+  }, [selectedRoute.id, selectedRoute.type, notices, now, sessionDismissedNotices]);
+
   const trafficNews = useMemo<TrafficNewsData>(() => {
      if (activeType === TransportType.FERRY) return { status: 'normal', details: { en: [], zh: [] } };
      const routeId = selectedRoute.id;
@@ -814,6 +1068,7 @@ export default function App() {
      const THREE_HOURS = 3 * 60 * 60 * 1000;
      
      const validUserReports = userReports.filter(r => {
+         if (isNaN(r.timestamp)) return false;
          const reportRoute = r.route.toLowerCase();
          const isRouteNR331 = routeId === 'NR331' || routeNameEn === 'tsuen wan' || routeNameZh === '荃灣';
          const isRouteNR331S = routeId === 'NR331S' || routeNameEn === 'tw west' || routeNameZh === '荃灣西';
@@ -1006,7 +1261,7 @@ export default function App() {
     }
     let collapseLabel = t.show12h; let expandLabel = t.show48h; if (GROUP_B.includes(selectedRoute.id)) collapseLabel = t.show24h;
 
-    if (isRealTimeMode && selectedRoute.id === '230R') {
+    if (isRealTimeMode && (selectedRoute.id === '230R' || selectedRoute.id === 'NR331S')) {
         let rtCountdown: CountdownState = { minutes: 0, seconds: 0, departureTime: '--:--', isAvailable: false };
         let rtUpcoming: ScheduleItem[] = [];
         
@@ -1081,8 +1336,8 @@ export default function App() {
           </div>
         )}
         <HeroCountdown {...currentCountdown} badges={currentCountdown.badges || []} lang={lang} themeColor={themeColor} fontSize={fontSize} transportType={activeType} onShowTraffic={() => setIsTrafficModalOpen(true)} trafficStatus={trafficNews.status} />
-        <UpcomingSchedule items={nextDepartures} lang={lang} isFullList={showFullSchedule} crossRoute={crossRouteData} routeId={selectedRoute.id} directionIndex={directionIndex} canExtend={canExtend} isExtendedView={isExtendedView} onToggleView={() => setIsExtendedView(!isExtendedView)} collapseLabel={collapseLabel} expandLabel={expandLabel} themeColor={themeColor} fontSize={fontSize} currentTimeSeconds={currentTimeSeconds} activeType={activeType} showRealTimeButton={selectedRoute.id === '230R'} isRealTime={isRealTimeMode} onToggleRealTime={() => setIsRealTimeMode(!isRealTimeMode)} />
-        {isRealTimeMode && selectedRoute.id === '230R' && (
+        <UpcomingSchedule items={nextDepartures} lang={lang} isFullList={showFullSchedule} crossRoute={crossRouteData} routeId={selectedRoute.id} directionIndex={directionIndex} canExtend={canExtend} isExtendedView={isExtendedView} onToggleView={() => setIsExtendedView(!isExtendedView)} collapseLabel={collapseLabel} expandLabel={expandLabel} themeColor={themeColor} fontSize={fontSize} currentTimeSeconds={currentTimeSeconds} activeType={activeType} showRealTimeButton={selectedRoute.id === '230R' || selectedRoute.id === 'NR331S'} isRealTime={isRealTimeMode} onToggleRealTime={() => setIsRealTimeMode(!isRealTimeMode)} />
+        {isRealTimeMode && (selectedRoute.id === '230R' || selectedRoute.id === 'NR331S') && (
           <div className="text-center text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-4 mb-8">
             {translations[lang].dataSource}
           </div>
@@ -1091,6 +1346,55 @@ export default function App() {
       <Footer currentType={activeType} onTypeChange={handleTypeChange} lang={lang} onOpenSettings={() => setIsSettingsOpen(true)} themeColor={themeColor} fontSize={fontSize} />
       <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} lang={lang} onLangChange={setLang} scheduleOverride={scheduleOverride} onScheduleOverrideChange={setScheduleOverride} themeMode={themeMode} onThemeModeChange={setThemeMode} themeColor={themeColor} fontSize={fontSize} onFontSizeChange={setFontSize} />
       <TrafficModal isOpen={isTrafficModalOpen} onClose={() => setIsTrafficModalOpen(false)} lang={lang} themeColor={themeColor} trafficNews={trafficNews} lastUpdate={trafficLastUpdate} selectedRoute={selectedRoute} syncStatus={syncStatus} />
+      
+      {activeNotice && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-300">
+            <div className={`bg-${themeColor}-600 p-4 flex justify-between items-center text-white`}>
+              <div className="flex items-center space-x-2">
+                <Info size={20} />
+                <h3 className="font-bold">{translations[lang].specialNotice}</h3>
+              </div>
+              <button onClick={() => {
+                if (activeNotice) {
+                  setSessionDismissedNotices(prev => [...prev, activeNotice.id]);
+                }
+                setActiveNotice(null);
+              }} className="p-1 hover:bg-white/20 rounded-full transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-6">
+              <p className="text-slate-700 whitespace-pre-wrap leading-relaxed text-sm">
+                {activeNotice.message}
+              </p>
+              <div className="mt-6 pt-4 border-t border-slate-100 flex items-center">
+                <label className="flex items-center space-x-2 cursor-pointer group">
+                  <input 
+                    type="checkbox" 
+                    className={`w-4 h-4 rounded border-slate-300 text-${themeColor}-600 focus:ring-${themeColor}-500`}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        const newDismissed = [...dismissedNotices, activeNotice.id];
+                        setDismissedNotices(newDismissed);
+                        localStorage.setItem('dismissedNotices', JSON.stringify(newDismissed));
+                      } else {
+                        const newDismissed = dismissedNotices.filter(id => id !== activeNotice.id);
+                        setDismissedNotices(newDismissed);
+                        localStorage.setItem('dismissedNotices', JSON.stringify(newDismissed));
+                      }
+                    }}
+                    checked={dismissedNotices.includes(activeNotice.id)}
+                  />
+                  <span className="text-xs text-slate-500 group-hover:text-slate-700 transition-colors">
+                    {translations[lang].doNotShowAgain}
+                  </span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
