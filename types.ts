@@ -47,3 +47,11 @@ export interface CountdownState {
   departureTime: string;
   isAvailable: boolean;
 }
+
+export interface RouteNotice {
+  id: string;
+  routeId: string;
+  message: string;
+  postingDateTime: string;
+  deleteDateTime: string;
+}
