@@ -938,7 +938,7 @@ export const routes: Route[] = [
     type: TransportType.FERRY,
     directions: [
       {
-        label: { en: 'To Tsuen Wan', zh: '往荃灣' },
+        label: { en: 'To Tsuen Wan West', zh: '往荃灣西' },
         from: { en: 'Park Island', zh: '珀麗灣' },
         to: { en: 'Tsuen Wan Pier', zh: '荃灣碼頭' },
         stops: [],
