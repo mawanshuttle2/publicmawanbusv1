@@ -250,12 +250,12 @@ const RECOVERY_KEYWORDS = ['交通復常', '交通回復正常'];
 const unique = (arr: string[]) => Array.from(new Set(arr));
 
 const ROUTE_KEYWORDS: Record<string, string[]> = {
-  'NR330': unique(['青馬大橋', '青敬路', '担杆山交匯處', '青衣北岸公路', '青衣西北交匯處', '青嶼幹線', '青荃路']),
+  'NR330': unique(['青馬大橋', '青敬路', '担杆山交匯處', '青衣北岸公路', '青衣西北交匯處', '青嶼幹線', '青荃路', '荃青交匯處']),
   'NR332': unique(['青馬大橋', '青嶼幹線', '青衣西北交匯處', '青衣北岸公路', '青荃路', '荃青交匯處', '荃灣路', '興芳路', '葵福路', '葵仁路', '興寧路']),
-  'NR331': unique(['青馬大橋', '青嶼幹線', '青衣西北交匯處', '青衣北岸公路', '青荃路', '荃青交匯處', '德士古道', '德士古道北', '德士古道天橋', '城門道', '西樓角路', '大河道', '青山公路-荃灣段', '青山公路-葵涌段', '國瑞路']),
-  'NR331S': unique(['青馬大橋', '青嶼幹線', '青衣西北交匯處', '青衣北岸公路', '青荃路','荃青交匯處', '德士古道', '德士古道北', '德士古道天橋', '荃錦交匯處', '大河道北', '大河道', '海貴路', '大河道', '大河道北']),
+  'NR331': unique(['青馬大橋', '青嶼幹線', '青衣西北交匯處', '青衣北岸公路', '青荃路', '德士古道', '德士古道北', '德士古道天橋', '城門道', '西樓角路', '大河道', '青山公路-荃灣段', '青山公路-葵涌段', '國瑞路']),
+  'NR331S': unique(['青馬大橋', '青嶼幹線', '青衣西北交匯處', '青衣北岸公路', '青荃路', '德士古道', '德士古道北', '德士古道天橋', '荃錦交匯處', '大河道北', '大河道', '海貴路', '大河道', '大河道北']),
   'NR334': unique(['青馬大橋', '青衣西北交匯處', '青嶼幹線', '北大嶼山公路', '機場路', '駿運路交滙處', '觀景路', '國泰城通道路', '觀景路', '東岸路', '機場路', '暢航路', '暢連路', '暢達路', '機場北交滙處', '機場路', '航天城路', '航天城交匯處', '赤鱲角路', '順朗路']),
-  'NR338': unique(['青馬大橋', '青嶼幹線', '青衣西北交匯處', '長青公路', '長青隧道', '青葵公路', '西九龍公路', '西隧', '西區海底隧道', '干諾道西天橋', '干諾道中天橋', '中環及灣仔繞道', '民寶街', '金融街', '民祥街', '民耀街', '民光街', '民耀街', '民祥街', '干諾道中西行', '干諾道西']),
+  'NR338': unique(['青馬大橋', '青嶼幹線', '青衣西北交匯處', '長青公路', '長青隧道', '青葵公路', '西九龍公路', '西區海底隧道', '干諾道西天橋', '干諾道中天橋', '中環及灣仔繞道', '民寶街', '金融街', '民祥街', '民耀街', '民光街', '民耀街', '民祥街', '干諾道中西行', '干諾道西']),
   '230R': unique(['雅翔道', '柯士甸道西', '廣東道', '梳士巴利道', '九龍公園徑', '佐敦道', '連翔道', '海輝道', '深旺道', '東京街西', '西九龍公路', '青葵公路', '長青隧道', '長青公路', '青衣西北交匯處', '青嶼幹線', '欽州街西', '青馬大橋'])
 };
 
@@ -579,7 +579,7 @@ const SettingsModal: React.FC<{ isOpen: boolean; onClose: () => void; lang: Lang
            <div> <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-5">{t.selectLanguage}</label> <div className="grid grid-cols-2 gap-4"> {(['en', 'zh'] as Language[]).map((l) => ( <button key={l} onClick={() => onLangChange(l)} className={`p-5 rounded-3xl border-2 transition-all text-left ${ lang === l ? `border-${themeColor}-600 bg-${themeColor}-50/50 text-${themeColor}-700 shadow-lg shadow-${themeColor}-100` : 'border-slate-100 text-slate-400' }`} > <div className="font-black text-lg leading-none mb-2">{l === 'en' ? 'English' : '繁體中文'}</div> <div className="text-[10px] uppercase font-bold opacity-60">{l === 'en' ? 'Default' : 'Traditional'}</div> </button> ))} </div> </div>
            <div> <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-5">{t.scheduleType}</label> <div className="grid grid-cols-2 gap-3"> {(['auto', 'weekday', 'saturday', 'sunday'] as ScheduleOverride[]).map((mode) => ( <button key={mode} onClick={() => onScheduleOverrideChange(mode)} className={`flex items-center justify-between p-4 rounded-3xl border-2 transition-all ${ scheduleOverride === mode ? `border-${themeColor}-600 bg-${themeColor}-50/50 text-${themeColor}-700 shadow-lg shadow-${themeColor}-100` : 'border-slate-100 text-slate-400' }`} > <span className="font-black text-sm">{t[mode as keyof typeof t] as string}</span> {scheduleOverride === mode && <Check size={16} strokeWidth={3} />} </button> ))} </div> </div>
         </div>
-        <div className="mt-12 pb-6 sm:pb-0"> <div className="text-center text-[10px] text-slate-300 font-bold mb-2 uppercase tracking-widest"> Version: 2.5 &bull; {updateLabel}: 2026/4/7 </div> <button onClick={onClose} className={`w-full py-5 bg-${themeColor}-600 text-white font-black text-lg rounded-3xl shadow-2xl shadow-${themeColor}-200 active:scale-95 transition-all`}> {t.close} </button> </div>
+        <div className="mt-12 pb-6 sm:pb-0"> <div className="text-center text-[10px] text-slate-300 font-bold mb-2 uppercase tracking-widest"> Version: 2.5.1 &bull; {updateLabel}: 2026/7/2 </div> <button onClick={onClose} className={`w-full py-5 bg-${themeColor}-600 text-white font-black text-lg rounded-3xl shadow-2xl shadow-${themeColor}-200 active:scale-95 transition-all`}> {t.close} </button> </div>
       </div>
     </div>
   );
@@ -667,6 +667,8 @@ export default function App() {
 
         const csvExportUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&cachebust=${timestamp}`;
         const strategies = [
+            `https://corsproxy.io/?${encodeURIComponent(csvExportUrl)}`,
+            `https://api.allorigins.win/raw?url=${encodeURIComponent(csvExportUrl)}`,
             `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(csvExportUrl)}`,
             `https://api.allorigins.win/get?url=${encodeURIComponent(csvExportUrl)}`
         ];
@@ -724,6 +726,14 @@ export default function App() {
         const timestamp = Date.now();
         
         const strategies = [
+            {
+                url: `https://corsproxy.io/?${encodeURIComponent(TARGET_URL + '?t=' + timestamp)}`,
+                type: 'text'
+            },
+            { 
+                url: `https://api.allorigins.win/raw?url=${encodeURIComponent(TARGET_URL + '?t=' + timestamp)}`,
+                type: 'text'
+            },
             { 
                 url: `https://api.allorigins.win/get?url=${encodeURIComponent(TARGET_URL + '?t=' + timestamp)}&cachebust=${timestamp}`,
                 type: 'json'
@@ -750,12 +760,23 @@ export default function App() {
                 if (!html || html.length < 100) continue;
 
                 const doc = new DOMParser().parseFromString(html, "text/html");
-                const bodyText = doc.body.innerText || "";
+                const items = Array.from(doc.querySelectorAll('li.inner'));
                 
-                // RTHK traffic news parsing - relaxed check for date existence anywhere in line
-                const lines = bodyText.split('\n')
-                    .map(line => line.trim())
+                // RTHK traffic news parsing - combine text content of each list item
+                const lines = items.map(li => li.textContent || "")
+                    .map(text => text.replace(/\s+/g, ' ').trim())
                     .filter(line => line.length > 15 && /\d{4}-\d{2}-\d{2}/.test(line));
+
+                // Fallback to bodyText parsing if no li.inner elements found (e.g. layout change)
+                if (lines.length === 0) {
+                    const bodyText = doc.body.innerText || "";
+                    const fallbackLines = bodyText.split('\n')
+                        .map(line => line.trim())
+                        .filter(line => line.length > 15 && /\d{4}-\d{2}-\d{2}/.test(line));
+                    if (fallbackLines.length > 0) {
+                        lines.push(...fallbackLines);
+                    }
+                }
 
                 if (lines.length > 0) {
                     if (isMounted) {
@@ -775,6 +796,8 @@ export default function App() {
         const timestamp = Date.now();
         const csvExportUrl = `https://docs.google.com/spreadsheets/d/${NOTICES_SHEET_ID}/export?format=csv&cachebust=${timestamp}`;
         const strategies = [
+            `https://corsproxy.io/?${encodeURIComponent(csvExportUrl)}`,
+            `https://api.allorigins.win/raw?url=${encodeURIComponent(csvExportUrl)}`,
             `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(csvExportUrl)}`,
             `https://api.allorigins.win/get?url=${encodeURIComponent(csvExportUrl)}`
         ];
