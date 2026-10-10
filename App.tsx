@@ -681,7 +681,7 @@ const SettingsModal: React.FC<{ isOpen: boolean; onClose: () => void; lang: Lang
            <div> <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-5">{t.selectLanguage}</label> <div className="grid grid-cols-2 gap-4"> {(['en', 'zh'] as Language[]).map((l) => ( <button key={l} onClick={() => onLangChange(l)} className={`p-5 rounded-3xl border-2 transition-all text-left ${ lang === l ? `border-${themeColor}-600 bg-${themeColor}-50/50 text-${themeColor}-700 shadow-lg shadow-${themeColor}-100` : 'border-slate-100 text-slate-400' }`} > <div className="font-black text-lg leading-none mb-2">{l === 'en' ? 'English' : '繁體中文'}</div> <div className="text-[10px] uppercase font-bold opacity-60">{l === 'en' ? 'Default' : 'Traditional'}</div> </button> ))} </div> </div>
            <div> <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-5">{t.scheduleType}</label> <div className="grid grid-cols-2 gap-3"> {(['auto', 'weekday', 'saturday', 'sunday'] as ScheduleOverride[]).map((mode) => ( <button key={mode} onClick={() => onScheduleOverrideChange(mode)} className={`flex items-center justify-between p-4 rounded-3xl border-2 transition-all ${ scheduleOverride === mode ? `border-${themeColor}-600 bg-${themeColor}-50/50 text-${themeColor}-700 shadow-lg shadow-${themeColor}-100` : 'border-slate-100 text-slate-400' }`} > <span className="font-black text-sm">{t[mode as keyof typeof t] as string}</span> {scheduleOverride === mode && <Check size={16} strokeWidth={3} />} </button> ))} </div> </div>
         </div>
-        <div className="mt-12 pb-6 sm:pb-0"> <div className="text-center text-[10px] text-slate-300 font-bold mb-2 uppercase tracking-widest"> Version: 2.5.1 &bull; {updateLabel}: 2026/10/11 </div> <button onClick={onClose} className={`w-full py-5 bg-${themeColor}-600 text-white font-black text-lg rounded-3xl shadow-2xl shadow-${themeColor}-200 active:scale-95 transition-all`}> {t.close} </button> </div>
+        <div className="mt-12 pb-6 sm:pb-0"> <div className="text-center text-[10px] text-slate-300 font-bold mb-2 uppercase tracking-widest"> Version: 2.5.1 &bull; {updateLabel}: 2026/10/2 </div> <button onClick={onClose} className={`w-full py-5 bg-${themeColor}-600 text-white font-black text-lg rounded-3xl shadow-2xl shadow-${themeColor}-200 active:scale-95 transition-all`}> {t.close} </button> </div>
       </div>
     </div>
   );
@@ -734,6 +734,7 @@ export default function App() {
 
   useEffect(() => {
     setSessionDismissedNotices([]);
+    setActiveNotice(null);
   }, [selectedRoute.id]);
 
   useEffect(() => {
@@ -1150,7 +1151,10 @@ export default function App() {
   }, [isRealTimeMode, selectedRoute.id, directionIndex, selectedStopIndex]);
 
   useEffect(() => {
-    const nowTime = now.getTime();
+    // If a notice is already open, do not overwrite or close it
+    if (activeNotice) return;
+
+    const nowTime = Date.now();
     let currentDismissed: string[] = [];
     try {
       const saved = localStorage.getItem('dismissedNotices');
@@ -1178,8 +1182,10 @@ export default function App() {
 
     validNotices.sort((a, b) => new Date(b.postingDateTime).getTime() - new Date(a.postingDateTime).getTime());
 
-    setActiveNotice(validNotices.length > 0 ? validNotices[0] : null);
-  }, [selectedRoute.id, selectedRoute.type, notices, now, sessionDismissedNotices]);
+    if (validNotices.length > 0) {
+      setActiveNotice(validNotices[0]);
+    }
+  }, [selectedRoute.id, selectedRoute.type, notices, sessionDismissedNotices]);
 
   const activeRouteNotices = useMemo(() => {
     const nowTime = now.getTime();
@@ -1455,7 +1461,14 @@ export default function App() {
                 <span className="font-extrabold text-amber-900 flex-shrink-0">{translations[lang].specialNotice}:</span>
                 <span className="truncate text-amber-800">{activeRouteNotices[0].message}</span>
               </div>
-              <ChevronRight size={16} className="text-amber-600 flex-shrink-0 ml-1" />
+              <div className="flex items-center gap-1.5 flex-shrink-0 ml-1">
+                {activeRouteNotices.length > 1 && (
+                  <span className="bg-amber-200/90 text-amber-900 text-[10px] px-1.5 py-0.5 rounded-full font-bold">
+                    {activeRouteNotices.length}
+                  </span>
+                )}
+                <ChevronRight size={16} className="text-amber-600" />
+              </div>
             </button>
           </div>
         )}
@@ -1496,29 +1509,71 @@ export default function App() {
       <TrafficModal isOpen={isTrafficModalOpen} onClose={() => setIsTrafficModalOpen(false)} lang={lang} themeColor={themeColor} trafficNews={trafficNews} lastUpdate={trafficLastUpdate} selectedRoute={selectedRoute} syncStatus={syncStatus} />
       
       {activeNotice && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-300">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-300">
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-300"
+          onClick={() => {
+            if (activeNotice) {
+              setSessionDismissedNotices(prev => [...prev, activeNotice.id]);
+            }
+            setActiveNotice(null);
+          }}
+        >
+          <div 
+            className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-300"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className={`bg-${themeColor}-600 p-4 flex justify-between items-center text-white`}>
               <div className="flex items-center space-x-2">
                 <Info size={20} />
                 <h3 className="font-bold">{translations[lang].specialNotice}</h3>
               </div>
-              <button onClick={() => {
-                if (activeNotice) {
-                  setSessionDismissedNotices(prev => [...prev, activeNotice.id]);
-                }
-                setActiveNotice(null);
-              }} className="p-1 hover:bg-white/20 rounded-full transition-colors">
+              <button 
+                onClick={() => {
+                  if (activeNotice) {
+                    setSessionDismissedNotices(prev => [...prev, activeNotice.id]);
+                  }
+                  setActiveNotice(null);
+                }} 
+                className="p-1 hover:bg-white/20 rounded-full transition-colors"
+                aria-label={translations[lang].close}
+              >
                 <X size={20} />
               </button>
             </div>
             <div className="p-6">
-              <div className="mb-3 flex items-center gap-2">
+              <div className="mb-3 flex items-center justify-between">
                 <span className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full bg-${themeColor}-50 text-${themeColor}-700 border border-${themeColor}-100`}>
                   {activeNotice.routeId.toUpperCase() === 'ALL' || activeNotice.routeId === '全部' ? (lang === 'zh' ? '所有路線' : 'All Routes') : activeNotice.routeId}
                 </span>
+                {activeRouteNotices.length > 1 && (
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[11px] font-semibold text-slate-400">
+                      {activeRouteNotices.findIndex(n => n.id === activeNotice.id) + 1} / {activeRouteNotices.length}
+                    </span>
+                    <button
+                      onClick={() => {
+                        const currIdx = activeRouteNotices.findIndex(n => n.id === activeNotice.id);
+                        const prevIdx = (currIdx - 1 + activeRouteNotices.length) % activeRouteNotices.length;
+                        setActiveNotice(activeRouteNotices[prevIdx]);
+                      }}
+                      className="w-6 h-6 flex items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold"
+                    >
+                      ‹
+                    </button>
+                    <button
+                      onClick={() => {
+                        const currIdx = activeRouteNotices.findIndex(n => n.id === activeNotice.id);
+                        const nextIdx = (currIdx + 1) % activeRouteNotices.length;
+                        setActiveNotice(activeRouteNotices[nextIdx]);
+                      }}
+                      className="w-6 h-6 flex items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold"
+                    >
+                      ›
+                    </button>
+                  </div>
+                )}
               </div>
-              <p className="text-slate-700 whitespace-pre-wrap leading-relaxed text-sm">
+              <p className="text-slate-700 whitespace-pre-wrap leading-relaxed text-sm max-h-60 overflow-y-auto">
                 {activeNotice.message}
               </p>
               <div className="mt-6 pt-4 border-t border-slate-100 flex items-center">
@@ -1544,6 +1599,17 @@ export default function App() {
                   </span>
                 </label>
               </div>
+              <button
+                onClick={() => {
+                  if (activeNotice) {
+                    setSessionDismissedNotices(prev => [...prev, activeNotice.id]);
+                  }
+                  setActiveNotice(null);
+                }}
+                className={`mt-4 w-full py-2.5 bg-${themeColor}-600 hover:bg-${themeColor}-700 text-white font-bold text-sm rounded-xl transition-all shadow-sm active:scale-98`}
+              >
+                {translations[lang].close}
+              </button>
             </div>
           </div>
         </div>
