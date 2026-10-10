@@ -259,6 +259,108 @@ const ROUTE_KEYWORDS: Record<string, string[]> = {
   '230R': unique(['雅翔道', '柯士甸道西', '廣東道', '梳士巴利道', '九龍公園徑', '佐敦道', '連翔道', '海輝道', '深旺道', '東京街西', '西九龍公路', '青葵公路', '長青隧道', '長青公路', '青衣西北交匯處', '青嶼幹線', '欽州街西', '青馬大橋'])
 };
 
+export const parseNoticeDate = (dStr?: string, fallbackBaseDateStr?: string): Date => {
+  if (!dStr || !dStr.trim()) {
+    if (fallbackBaseDateStr && fallbackBaseDateStr !== dStr) {
+      return parseNoticeDate(fallbackBaseDateStr);
+    }
+    return new Date();
+  }
+
+  let str = dStr.trim();
+  str = str.replace(/上午\s*/gi, 'AM ').replace(/下午\s*/gi, 'PM ');
+  str = str.replace(/(AM|PM)\s*(\d{1,2}:\d{2}(?::\d{2})?)/i, '$2 $1');
+  str = str.replace(/年|月/g, '/').replace(/日/g, ' ');
+
+  const isOnlyTime = /^(\d{1,2}:\d{2}(?::\d{2})?(?:\s*(?:AM|PM))?)$/i.test(str.trim());
+  if (isOnlyTime && fallbackBaseDateStr) {
+    const base = parseNoticeDate(fallbackBaseDateStr);
+    const timeMatch = str.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?(?:\s*(AM|PM))?/i);
+    if (timeMatch && !isNaN(base.getTime())) {
+      let h = parseInt(timeMatch[1], 10);
+      const m = parseInt(timeMatch[2], 10);
+      const s = timeMatch[3] ? parseInt(timeMatch[3], 10) : 0;
+      const ampm = timeMatch[4]?.toUpperCase();
+      if (ampm === 'PM' && h < 12) h += 12;
+      if (ampm === 'AM' && h === 12) h = 0;
+      base.setHours(h, m, s, 0);
+      return base;
+    }
+  }
+
+  const parsedTs = Date.parse(str);
+  if (!isNaN(parsedTs)) {
+    return new Date(parsedTs);
+  }
+
+  const parts = str.split(/[/\s:-]/).filter(p => p.length > 0 && !/AM|PM/i.test(p));
+  if (parts.length >= 3) {
+    let y = parseInt(parts[0], 10);
+    let m = parseInt(parts[1], 10) - 1;
+    let d = parseInt(parts[2], 10);
+    if (parts[0].length !== 4 && parts[2].length === 4) {
+      d = parseInt(parts[0], 10);
+      m = parseInt(parts[1], 10) - 1;
+      y = parseInt(parts[2], 10);
+    }
+    let hours = parseInt(parts[3] || '0', 10);
+    const mins = parseInt(parts[4] || '0', 10);
+    const secs = parseInt(parts[5] || '0', 10);
+    if (/PM/i.test(str) && hours < 12) hours += 12;
+    if (/AM/i.test(str) && hours === 12) hours = 0;
+    const dObj = new Date(y, m, d, hours, mins, secs);
+    if (!isNaN(dObj.getTime())) return dObj;
+  }
+
+  return new Date();
+};
+
+export const isNoticeMatchRoute = (rawNoticeRoute: string, selectedRoute: Route): boolean => {
+  if (!rawNoticeRoute) return true;
+  const nr = rawNoticeRoute.toLowerCase().trim();
+  const currId = selectedRoute.id.toLowerCase();
+  const isBus = selectedRoute.type === TransportType.BUS;
+  const isFerry = selectedRoute.type === TransportType.FERRY;
+
+  if (nr === 'all' || nr === '全部' || nr === '所有' || nr === '全線' || nr === '所有路線' || nr === '全部路線' || nr === '全路線') {
+    return true;
+  }
+  if ((nr.includes('all bus') || nr.includes('所有巴士') || nr.includes('全部巴士') || nr.includes('巴士全線')) && isBus) {
+    return true;
+  }
+  if ((nr.includes('all ferry') || nr.includes('所有渡輪') || nr.includes('全部渡輪') || nr.includes('渡輪全線')) && isFerry) {
+    return true;
+  }
+
+  const parts = nr.split(/[,;\/、&+\n]+/).map(p => p.trim().toLowerCase());
+  for (const part of parts) {
+    if (!part) continue;
+    if (part === 'all' || part === '全部' || part === '所有' || part === '全線') return true;
+    if ((part.includes('bus') || part.includes('巴士')) && isBus && (part.includes('all') || part.includes('全部') || part.includes('所有'))) return true;
+    if ((part.includes('ferry') || part.includes('渡輪')) && isFerry && (part.includes('all') || part.includes('全部') || part.includes('所有'))) return true;
+
+    if (part === currId) return true;
+
+    if (currId === 'ferry-central') {
+      if (part.includes('central') || part.includes('中環')) return true;
+    }
+    if (currId === 'ferry-tsuen-wan') {
+      if ((part.includes('tw') || part.includes('tsuen wan') || part.includes('荃灣')) && !part.includes('331')) return true;
+    }
+
+    if (currId === 'nr330' && (part.includes('nr330') || part.includes('330') || part.includes('青衣'))) return true;
+    if (currId === 'nr332' && (part.includes('nr332') || part.includes('332') || part.includes('葵芳'))) return true;
+    if (currId === 'nr331s' && (part.includes('nr331s') || part.includes('331s') || part.includes('荃灣西') || part.includes('tw west'))) return true;
+    if (currId === 'nr331' && (!part.includes('331s') && !part.includes('西') && (part.includes('nr331') || part.includes('331') || part.includes('荃灣')))) return true;
+    if (currId === 'nr334' && (part.includes('nr334') || part.includes('334') || part.includes('機場') || part.includes('airport') || part.includes('國泰城'))) return true;
+    if (currId === 'nr338' && (part.includes('nr338') || part.includes('338') || (part.includes('中環') && isBus))) return true;
+    if (currId === '230r' && (part.includes('230r') || part.includes('230') || part.includes('九龍站') || part.includes('kowloon'))) return true;
+
+    if (part.includes(currId) || currId.includes(part)) return true;
+  }
+  return false;
+};
+
 const CurrentTimeBar: React.FC<{ now: Date; lang: Language; displayType: DayType; themeColor: string; fontSize: FontSize }> = ({ now, lang, displayType, themeColor, fontSize }) => {
   const t = translations[lang];
   const options: Intl.DateTimeFormatOptions = {
@@ -579,7 +681,7 @@ const SettingsModal: React.FC<{ isOpen: boolean; onClose: () => void; lang: Lang
            <div> <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-5">{t.selectLanguage}</label> <div className="grid grid-cols-2 gap-4"> {(['en', 'zh'] as Language[]).map((l) => ( <button key={l} onClick={() => onLangChange(l)} className={`p-5 rounded-3xl border-2 transition-all text-left ${ lang === l ? `border-${themeColor}-600 bg-${themeColor}-50/50 text-${themeColor}-700 shadow-lg shadow-${themeColor}-100` : 'border-slate-100 text-slate-400' }`} > <div className="font-black text-lg leading-none mb-2">{l === 'en' ? 'English' : '繁體中文'}</div> <div className="text-[10px] uppercase font-bold opacity-60">{l === 'en' ? 'Default' : 'Traditional'}</div> </button> ))} </div> </div>
            <div> <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-5">{t.scheduleType}</label> <div className="grid grid-cols-2 gap-3"> {(['auto', 'weekday', 'saturday', 'sunday'] as ScheduleOverride[]).map((mode) => ( <button key={mode} onClick={() => onScheduleOverrideChange(mode)} className={`flex items-center justify-between p-4 rounded-3xl border-2 transition-all ${ scheduleOverride === mode ? `border-${themeColor}-600 bg-${themeColor}-50/50 text-${themeColor}-700 shadow-lg shadow-${themeColor}-100` : 'border-slate-100 text-slate-400' }`} > <span className="font-black text-sm">{t[mode as keyof typeof t] as string}</span> {scheduleOverride === mode && <Check size={16} strokeWidth={3} />} </button> ))} </div> </div>
         </div>
-        <div className="mt-12 pb-6 sm:pb-0"> <div className="text-center text-[10px] text-slate-300 font-bold mb-2 uppercase tracking-widest"> Version: 2.5.1 &bull; {updateLabel}: 2026/7/2 </div> <button onClick={onClose} className={`w-full py-5 bg-${themeColor}-600 text-white font-black text-lg rounded-3xl shadow-2xl shadow-${themeColor}-200 active:scale-95 transition-all`}> {t.close} </button> </div>
+        <div className="mt-12 pb-6 sm:pb-0"> <div className="text-center text-[10px] text-slate-300 font-bold mb-2 uppercase tracking-widest"> Version: 2.5.1 &bull; {updateLabel}: 2026/10/11 </div> <button onClick={onClose} className={`w-full py-5 bg-${themeColor}-600 text-white font-black text-lg rounded-3xl shadow-2xl shadow-${themeColor}-200 active:scale-95 transition-all`}> {t.close} </button> </div>
       </div>
     </div>
   );
@@ -665,21 +767,35 @@ export default function App() {
             } catch (e) { console.warn("Apps Script fetch failed", e); }
         }
 
+        const gvizUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&t=${timestamp}`;
         const csvExportUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&cachebust=${timestamp}`;
         const strategies = [
-            `https://corsproxy.io/?${encodeURIComponent(csvExportUrl)}`,
-            `https://api.allorigins.win/raw?url=${encodeURIComponent(csvExportUrl)}`,
-            `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(csvExportUrl)}`,
-            `https://api.allorigins.win/get?url=${encodeURIComponent(csvExportUrl)}`
+            { url: gvizUrl, type: 'text' },
+            { url: `https://api.allorigins.win/raw?url=${encodeURIComponent(gvizUrl)}`, type: 'text' },
+            { url: `https://api.allorigins.win/get?url=${encodeURIComponent(gvizUrl)}`, type: 'json' },
+            { url: `https://corsproxy.io/?${encodeURIComponent(gvizUrl)}`, type: 'text' },
+            { url: `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(gvizUrl)}`, type: 'text' },
+            { url: csvExportUrl, type: 'text' },
+            { url: `https://api.allorigins.win/raw?url=${encodeURIComponent(csvExportUrl)}`, type: 'text' },
+            { url: `https://api.allorigins.win/get?url=${encodeURIComponent(csvExportUrl)}`, type: 'json' }
         ];
 
         let csvData = "";
-        for (const proxy of strategies) {
+        for (const strategy of strategies) {
             try {
-                const res = await fetch(proxy);
+                const res = await fetch(strategy.url);
                 if (!res.ok) continue;
-                csvData = proxy.includes('allorigins') ? (await res.json()).contents : await res.text();
-                if (csvData && csvData.length > 30) break;
+                let text = "";
+                if (strategy.type === 'json') {
+                    const data = await res.json();
+                    text = data.contents || "";
+                } else {
+                    text = await res.text();
+                }
+                if (text && text.length > 25 && !text.trim().startsWith('<!DOCTYPE') && !text.trim().startsWith('<html')) {
+                    csvData = text;
+                    break;
+                }
             } catch (e) {}
         }
 
@@ -794,25 +910,40 @@ export default function App() {
     const fetchNotices = async () => {
         if (!NOTICES_SHEET_ID) return;
         const timestamp = Date.now();
+        const gvizUrl = `https://docs.google.com/spreadsheets/d/${NOTICES_SHEET_ID}/gviz/tq?tqx=out:csv&t=${timestamp}`;
         const csvExportUrl = `https://docs.google.com/spreadsheets/d/${NOTICES_SHEET_ID}/export?format=csv&cachebust=${timestamp}`;
+
         const strategies = [
-            `https://corsproxy.io/?${encodeURIComponent(csvExportUrl)}`,
-            `https://api.allorigins.win/raw?url=${encodeURIComponent(csvExportUrl)}`,
-            `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(csvExportUrl)}`,
-            `https://api.allorigins.win/get?url=${encodeURIComponent(csvExportUrl)}`
+            { url: gvizUrl, type: 'text' },
+            { url: `https://api.allorigins.win/raw?url=${encodeURIComponent(gvizUrl)}`, type: 'text' },
+            { url: `https://api.allorigins.win/get?url=${encodeURIComponent(gvizUrl)}`, type: 'json' },
+            { url: `https://corsproxy.io/?${encodeURIComponent(gvizUrl)}`, type: 'text' },
+            { url: `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(gvizUrl)}`, type: 'text' },
+            { url: csvExportUrl, type: 'text' },
+            { url: `https://api.allorigins.win/raw?url=${encodeURIComponent(csvExportUrl)}`, type: 'text' },
+            { url: `https://api.allorigins.win/get?url=${encodeURIComponent(csvExportUrl)}`, type: 'json' }
         ];
 
         let csvData = "";
-        for (const proxy of strategies) {
+        for (const strategy of strategies) {
             try {
-                const res = await fetch(proxy);
+                const res = await fetch(strategy.url);
                 if (!res.ok) continue;
-                csvData = proxy.includes('allorigins') ? (await res.json()).contents : await res.text();
-                if (csvData && csvData.length > 30) break;
+                let text = "";
+                if (strategy.type === 'json') {
+                    const data = await res.json();
+                    text = data.contents || "";
+                } else {
+                    text = await res.text();
+                }
+                if (text && text.length > 15 && !text.trim().startsWith('<!DOCTYPE') && !text.trim().startsWith('<html')) {
+                    csvData = text;
+                    break;
+                }
             } catch (e) {}
         }
 
-        if (csvData && csvData.length > 30) {
+        if (csvData && csvData.length > 15) {
             const parseCSV = (text: string) => {
                 const result = [];
                 let row = [];
@@ -856,111 +987,76 @@ export default function App() {
             if (allRows.length === 0) return;
 
             const headers = allRows[0].map(c => c.trim().toLowerCase());
-            const hasTimestampHeader = headers.some(h => h.includes('timestamp') || h.includes('時間'));
-            const dataRows = hasTimestampHeader ? allRows.slice(1) : allRows;
-            
+            const hasHeader = headers.some(h => 
+                h.includes('timestamp') || h.includes('時間') || 
+                h.includes('route') || h.includes('路線') || 
+                h.includes('message') || h.includes('訊息') || h.includes('通告') || h.includes('內容')
+            );
+            const dataRows = hasHeader ? allRows.slice(1) : allRows;
+            if (dataRows.length === 0) return;
+
+            // Intelligent column mapping
             let colIdx = {
-                timestamp: headers.findIndex(h => h.includes('timestamp') || h.includes('時間')),
-                message: headers.findIndex(h => h.includes('message') || h.includes('訊息') || h.includes('內容')),
-                postingDate: headers.findIndex(h => h.includes('posting date') || h.includes('日期')),
-                postingTime: headers.findIndex(h => h.includes('posting time') || h.includes('發佈時間') || h.includes('開始')),
-                deleteTime: headers.findIndex(h => h.includes('delete time') || h.includes('刪除時間') || h.includes('結束')),
-                route: headers.findIndex(h => h.includes('route') || h.includes('路線'))
+                timestamp: headers.findIndex(h => h.includes('timestamp') || h.includes('時間戳記') || h.includes('提交時間')),
+                route: headers.findIndex(h => h.includes('route') || h.includes('路線') || h.includes('巴士') || h.includes('渡輪') || h.includes('線路')),
+                message: headers.findIndex(h => h.includes('message') || h.includes('訊息') || h.includes('通告') || h.includes('內容') || h.includes('notice') || h.includes('詳情') || h.includes('說明') || h.includes('事項') || h.includes('資訊')),
+                postingDate: headers.findIndex(h => (h.includes('posting date') || h.includes('發佈日期') || h.includes('開始日期')) || (h.includes('日期') && !h.includes('時間'))),
+                postingTime: headers.findIndex(h => h.includes('posting time') || h.includes('發佈時間') || h.includes('開始時間') || h.includes('生效時間') || (h.includes('開始') && !h.includes('結束'))),
+                deleteTime: headers.findIndex(h => h.includes('delete time') || h.includes('刪除時間') || h.includes('結束時間') || h.includes('下架時間') || h.includes('到期時間') || h.includes('結束') || h.includes('有效期至'))
             };
 
-            // Fallback to fixed indices if headers are not found
             if (colIdx.timestamp === -1) colIdx.timestamp = 0;
-            if (colIdx.message === -1) colIdx.message = 1;
-            if (colIdx.postingDate === -1) colIdx.postingDate = 2;
-            if (colIdx.postingTime === -1) colIdx.postingTime = 3;
-            if (colIdx.deleteTime === -1) colIdx.deleteTime = 4;
-            if (colIdx.route === -1) colIdx.route = 5;
-
-            const parseDate = (dStr: string, baseDateStr?: string) => {
-                try {
-                    if (!dStr) return new Date().toISOString();
-                    
-                    let normalizedStr = dStr.trim().replace(/上午\s*/g, 'AM ').replace(/下午\s*/g, 'PM ');
-                    // Move AM/PM to the end if it's at the beginning of the time
-                    normalizedStr = normalizedStr.replace(/(AM|PM)\s*(\d{1,2}:\d{2}(?::\d{2})?)/i, '$2 $1');
-
-                    if (baseDateStr) {
-                        let isPM = /PM/i.test(normalizedStr);
-                        let isAM = /AM/i.test(normalizedStr);
-                        
-                        const timeMatch = normalizedStr.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/);
-                        if (timeMatch) {
-                            const baseDate = new Date(parseDate(baseDateStr));
-                            if (!isNaN(baseDate.getTime())) {
-                                let hours = parseInt(timeMatch[1], 10);
-                                const minutes = parseInt(timeMatch[2], 10);
-                                const seconds = timeMatch[3] ? parseInt(timeMatch[3], 10) : 0;
-                                
-                                if (isPM && hours < 12) hours += 12;
-                                if (isAM && hours === 12) hours = 0;
-                                
-                                baseDate.setHours(hours);
-                                baseDate.setMinutes(minutes);
-                                baseDate.setSeconds(seconds);
-                                return baseDate.toISOString();
-                            }
-                        } else if (normalizedStr.match(/^\d{4}$/)) {
-                            const hours = parseInt(normalizedStr.substring(0, 2), 10);
-                            const minutes = parseInt(normalizedStr.substring(2, 4), 10);
-                            const baseDate = new Date(parseDate(baseDateStr));
-                            if (!isNaN(baseDate.getTime())) {
-                                baseDate.setHours(hours);
-                                baseDate.setMinutes(minutes);
-                                baseDate.setSeconds(0);
-                                return baseDate.toISOString();
-                            }
-                        }
+            if (colIdx.route === -1) {
+                const firstRow = dataRows[0];
+                const routeMatchIdx = firstRow.findIndex(cell => {
+                    const c = cell.toLowerCase();
+                    return c.includes('nr33') || c.includes('330') || c.includes('331') || c.includes('332') || c.includes('334') || c.includes('338') || c.includes('230r') || c.includes('ferry') || c.includes('渡輪') || c.includes('全部') || c.includes('all') || c.includes('青衣') || c.includes('葵芳') || c.includes('荃灣') || c.includes('中環');
+                });
+                colIdx.route = routeMatchIdx !== -1 ? routeMatchIdx : (firstRow.length > 1 ? 1 : 0);
+            }
+            if (colIdx.message === -1) {
+                const firstRow = dataRows[0];
+                let maxLenIdx = -1;
+                let maxLen = 0;
+                firstRow.forEach((cell, idx) => {
+                    if (idx !== colIdx.timestamp && idx !== colIdx.route && cell.length > maxLen) {
+                        maxLen = cell.length;
+                        maxLenIdx = idx;
                     }
+                });
+                colIdx.message = maxLenIdx !== -1 ? maxLenIdx : (firstRow.length > 2 ? 2 : 1);
+            }
 
-                    let ts = Date.parse(normalizedStr);
-                    if (!isNaN(ts)) return new Date(ts).toISOString();
-                    
-                    const parts = normalizedStr.split(/[/\s:-]/).filter(p => p.length > 0 && !/AM|PM/i.test(p));
-                    if (parts.length >= 3) {
-                        let d, m, y;
-                        if (parts[0].length === 4) { y = parseInt(parts[0]); m = parseInt(parts[1]) - 1; d = parseInt(parts[2]); } 
-                        else { d = parseInt(parts[0]); m = parseInt(parts[1]) - 1; y = parseInt(parts[2]); }
-                        if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
-                            let hours = parseInt(parts[3] || '0');
-                            let isPM = /PM/i.test(normalizedStr);
-                            let isAM = /AM/i.test(normalizedStr);
-                            if (isPM && hours < 12) hours += 12;
-                            if (isAM && hours === 12) hours = 0;
-                            const date = new Date(y, m, d, hours, parseInt(parts[4] || '0'), parseInt(parts[5] || '0'));
-                            if (!isNaN(date.getTime())) return date.toISOString();
-                        }
+            const parsedNotices = dataRows.map((cols: string[], rowIdx: number) => {
+                const formTimestamp = cols[colIdx.timestamp]?.trim() || '';
+                const rawMessage = cols[colIdx.message]?.trim() || '';
+                const rawRoute = (colIdx.route !== -1 ? cols[colIdx.route]?.trim() : '') || 'all';
+                const rawPostingDate = colIdx.postingDate !== -1 ? cols[colIdx.postingDate]?.trim() : '';
+                const rawPostingTime = colIdx.postingTime !== -1 ? cols[colIdx.postingTime]?.trim() : '';
+                const rawDeleteTime = colIdx.deleteTime !== -1 ? cols[colIdx.deleteTime]?.trim() : '';
+
+                if (!rawMessage) return null;
+
+                const baseDate = rawPostingDate || formTimestamp || new Date().toISOString();
+                const postDateObj = rawPostingTime ? parseNoticeDate(rawPostingTime, baseDate) : parseNoticeDate(baseDate);
+
+                let deleteDateObj: Date;
+                if (rawDeleteTime) {
+                    deleteDateObj = parseNoticeDate(rawDeleteTime, baseDate);
+                    if (deleteDateObj.getTime() <= postDateObj.getTime()) {
+                        deleteDateObj = new Date(deleteDateObj.getTime() + 24 * 60 * 60 * 1000);
                     }
-                } catch (e) {
-                    console.warn("Date parsing error", e);
+                } else {
+                    deleteDateObj = new Date(postDateObj.getTime() + 72 * 60 * 60 * 1000);
                 }
-                return new Date().toISOString();
-            };
 
-            const parsedNotices = dataRows.map((cols: string[]) => {
-                if (cols.length < 5) return null;
-                
-                const formTimestamp = cols[colIdx.timestamp]?.trim();
-                const message = cols[colIdx.message]?.trim();
-                const postingDate = cols[colIdx.postingDate]?.trim();
-                const postingTime = cols[colIdx.postingTime]?.trim();
-                const deleteTime = cols[colIdx.deleteTime]?.trim();
-                const routeId = cols[colIdx.route]?.trim();
-                
-                if (!routeId || !message || !postingTime || !deleteTime) return null;
-
-                const baseDateToUse = postingDate ? postingDate : formTimestamp;
-
+                const safeTs = postDateObj.getTime() || Date.now();
                 return {
-                    id: "notice_" + new Date(parseDate(formTimestamp)).getTime(),
-                    routeId: routeId,
-                    message: message,
-                    postingDateTime: parseDate(postingTime, baseDateToUse),
-                    deleteDateTime: parseDate(deleteTime, baseDateToUse)
+                    id: `notice_${rowIdx}_${encodeURIComponent(rawRoute.slice(0, 15))}_${safeTs}`,
+                    routeId: rawRoute,
+                    message: rawMessage,
+                    postingDateTime: postDateObj.toISOString(),
+                    deleteDateTime: deleteDateObj.toISOString()
                 };
             }).filter((n: any): n is RouteNotice => n !== null);
 
@@ -973,7 +1069,20 @@ export default function App() {
     const fetchAll = () => { fetchRTHK(); fetchUserReports(); fetchNotices(); };
     fetchAll();
     const interval = setInterval(fetchAll, 15000); 
-    return () => { isMounted = false; clearInterval(interval); };
+
+    const handleFocus = () => { fetchAll(); };
+    window.addEventListener('focus', handleFocus);
+    const handleVisibility = () => {
+        if (document.visibilityState === 'visible') fetchAll();
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => { 
+        isMounted = false; 
+        clearInterval(interval); 
+        window.removeEventListener('focus', handleFocus);
+        document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, []);
 
   useEffect(() => {
@@ -1045,42 +1154,43 @@ export default function App() {
     let currentDismissed: string[] = [];
     try {
       const saved = localStorage.getItem('dismissedNotices');
-      if (saved) currentDismissed = JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          currentDismissed = parsed.filter(id => id && typeof id === 'string' && !id.includes('NaN'));
+        }
+      }
     } catch {}
 
     const validNotices = notices.filter(notice => {
-      const noticeRoute = notice.routeId.toLowerCase().trim();
-      const currentRouteId = selectedRoute.id.toLowerCase();
-      const currentRouteType = selectedRoute.type;
-      
-      let isRouteMatch = false;
-      if (noticeRoute === 'all') {
-          isRouteMatch = true;
-      } else if (noticeRoute === 'all bus' && currentRouteType === TransportType.BUS) {
-          isRouteMatch = true;
-      } else if (noticeRoute === 'all ferry' && currentRouteType === TransportType.FERRY) {
-          isRouteMatch = true;
-      } else if ((noticeRoute === 'tw ferry' || noticeRoute === 'tsuen wan ferry') && currentRouteId === 'ferry-tsuen-wan') {
-          isRouteMatch = true;
-      } else if ((noticeRoute === 'central ferry' || noticeRoute === 'central') && currentRouteId === 'ferry-central') {
-          isRouteMatch = true;
-      } else if (noticeRoute === currentRouteId) {
-          isRouteMatch = true;
-      }
-
+      const isRouteMatch = isNoticeMatchRoute(notice.routeId, selectedRoute);
       const isNotDismissed = !currentDismissed.includes(notice.id);
       const isNotSessionDismissed = !sessionDismissedNotices.includes(notice.id);
-      const postTime = new Date(notice.postingDateTime).getTime();
-      const deleteTime = new Date(notice.deleteDateTime).getTime();
-      const isWithinTime = nowTime >= postTime && nowTime <= deleteTime;
+      
+      const postTime = new Date(notice.postingDateTime).getTime() || 0;
+      let deleteTime = new Date(notice.deleteDateTime).getTime() || (postTime + 72 * 3600 * 1000);
+      if (deleteTime <= postTime) deleteTime = postTime + 72 * 3600 * 1000;
+
+      // Allow 10 minutes clock skew before postTime for immediately posted notices
+      const isWithinTime = (nowTime >= postTime - 10 * 60 * 1000) && (nowTime <= deleteTime);
       return isRouteMatch && isNotDismissed && isNotSessionDismissed && isWithinTime;
     });
 
-    // Sort by postingDateTime descending (newest first)
     validNotices.sort((a, b) => new Date(b.postingDateTime).getTime() - new Date(a.postingDateTime).getTime());
 
     setActiveNotice(validNotices.length > 0 ? validNotices[0] : null);
   }, [selectedRoute.id, selectedRoute.type, notices, now, sessionDismissedNotices]);
+
+  const activeRouteNotices = useMemo(() => {
+    const nowTime = now.getTime();
+    return notices.filter(notice => {
+      const isRouteMatch = isNoticeMatchRoute(notice.routeId, selectedRoute);
+      const postTime = new Date(notice.postingDateTime).getTime() || 0;
+      let deleteTime = new Date(notice.deleteDateTime).getTime() || (postTime + 72 * 3600 * 1000);
+      if (deleteTime <= postTime) deleteTime = postTime + 72 * 3600 * 1000;
+      return isRouteMatch && (nowTime >= postTime - 10 * 60 * 1000) && (nowTime <= deleteTime);
+    }).sort((a, b) => new Date(b.postingDateTime).getTime() - new Date(a.postingDateTime).getTime());
+  }, [notices, selectedRoute, now]);
 
   const trafficNews = useMemo<TrafficNewsData>(() => {
      if (activeType === TransportType.FERRY) return { status: 'normal', details: { en: [], zh: [] } };
@@ -1334,6 +1444,21 @@ export default function App() {
       <CurrentTimeBar now={now} lang={lang} displayType={effectiveDayType} themeColor={themeColor} fontSize={fontSize} />
       <Header selectedRoute={selectedRoute} onSelectRoute={handleSelectRoute} filteredRoutes={filteredRoutes} lang={lang} scheduleOverride={scheduleOverride} onToggleOverride={handleToggleOverride} favorites={favorites} onToggleFavorite={toggleFavorite} themeColor={themeColor} fontSize={fontSize} />
       <main className="animate-in fade-in slide-in-from-bottom-2 duration-700">
+        {activeRouteNotices.length > 0 && !activeNotice && (
+          <div className="mx-4 mt-2">
+            <button
+              onClick={() => setActiveNotice(activeRouteNotices[0])}
+              className={`w-full py-2.5 px-4 bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 border border-amber-300/50 rounded-2xl flex items-center justify-between transition-all text-xs font-bold shadow-sm active:scale-98`}
+            >
+              <div className="flex items-center gap-2 truncate">
+                <Info size={16} className="text-amber-600 flex-shrink-0" />
+                <span className="font-extrabold text-amber-900 flex-shrink-0">{translations[lang].specialNotice}:</span>
+                <span className="truncate text-amber-800">{activeRouteNotices[0].message}</span>
+              </div>
+              <ChevronRight size={16} className="text-amber-600 flex-shrink-0 ml-1" />
+            </button>
+          </div>
+        )}
         <SegmentedControl directions={selectedRoute.directions} selectedIndex={directionIndex} onSelect={setDirectionIndex} lang={lang} themeColor={themeColor} fontSize={fontSize} />
         {selectedRoute.directions[directionIndex].stops && selectedRoute.directions[directionIndex].stops.length > 0 && (
           <div className="mx-4 mt-2 overflow-x-auto custom-scrollbar pb-2">
@@ -1388,6 +1513,11 @@ export default function App() {
               </button>
             </div>
             <div className="p-6">
+              <div className="mb-3 flex items-center gap-2">
+                <span className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full bg-${themeColor}-50 text-${themeColor}-700 border border-${themeColor}-100`}>
+                  {activeNotice.routeId.toUpperCase() === 'ALL' || activeNotice.routeId === '全部' ? (lang === 'zh' ? '所有路線' : 'All Routes') : activeNotice.routeId}
+                </span>
+              </div>
               <p className="text-slate-700 whitespace-pre-wrap leading-relaxed text-sm">
                 {activeNotice.message}
               </p>
